@@ -1,0 +1,1921 @@
+<title>neXgen Healthcare — Operating Manual</title>
+
+<style>
+  /* ============================================================
+     Tokens — light is the ground truth; dark redefines tokens only.
+     ============================================================ */
+  :root {
+    --paper:      #F6F7F4;
+    --surface:    #FFFFFF;
+    --surface-2:  #EEF1EC;
+    --ink:        #131E1B;
+    --ink-mid:    #3E4E49;
+    --ink-soft:   #5D6D68;
+    --rule:       #DCE2DB;
+    --rule-firm:  #C3CCC2;
+
+    --patient:    #0D6B57;
+    --doctor:     #3A4A8F;
+    --desk:       #8A5A0B;
+    --admin:      #7A3260;
+
+    --ok:         #0D6B57;
+    --warn:       #8A5A0B;
+    --crit:       #A32B3B;
+
+    --tint:       #0D6B570F;
+    --shadow:     0 1px 2px #131e1b0d, 0 8px 24px -16px #131e1b26;
+
+    --display: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+    --body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:     #0F1614;
+      --surface:   #17201E;
+      --surface-2: #1E2926;
+      --ink:       #E7EDE9;
+      --ink-mid:   #B6C3BE;
+      --ink-soft:  #90A09B;
+      --rule:      #27322F;
+      --rule-firm: #3A4744;
+
+      --patient:   #4DBFA2;
+      --doctor:    #93A3E8;
+      --desk:      #D9A23F;
+      --admin:     #D48CBA;
+
+      --ok:        #4DBFA2;
+      --warn:      #D9A23F;
+      --crit:      #E8798A;
+
+      --tint:      #4dbfa214;
+      --shadow:    0 1px 2px #0000004d, 0 8px 24px -16px #00000080;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:     #0F1614;
+    --surface:   #17201E;
+    --surface-2: #1E2926;
+    --ink:       #E7EDE9;
+    --ink-mid:   #B6C3BE;
+    --ink-soft:  #90A09B;
+    --rule:      #27322F;
+    --rule-firm: #3A4744;
+    --patient:   #4DBFA2;
+    --doctor:    #93A3E8;
+    --desk:      #D9A23F;
+    --admin:     #D48CBA;
+    --ok:        #4DBFA2;
+    --warn:      #D9A23F;
+    --crit:      #E8798A;
+    --tint:      #4dbfa214;
+    --shadow:    0 1px 2px #0000004d, 0 8px 24px -16px #00000080;
+  }
+
+  :root[data-theme="light"] {
+    --paper:     #F6F7F4;
+    --surface:   #FFFFFF;
+    --surface-2: #EEF1EC;
+    --ink:       #131E1B;
+    --ink-mid:   #3E4E49;
+    --ink-soft:  #5D6D68;
+    --rule:      #DCE2DB;
+    --rule-firm: #C3CCC2;
+    --patient:   #0D6B57;
+    --doctor:    #3A4A8F;
+    --desk:      #8A5A0B;
+    --admin:     #7A3260;
+    --ok:        #0D6B57;
+    --warn:      #8A5A0B;
+    --crit:      #A32B3B;
+    --tint:      #0D6B570F;
+    --shadow:    0 1px 2px #131e1b0d, 0 8px 24px -16px #131e1b26;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--patient); color: var(--paper); }
+
+  a { color: inherit; }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--patient);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* ============================================================
+     Shell
+     ============================================================ */
+  .shell {
+    max-width: 1220px;
+    margin: 0 auto;
+    padding: 0 24px 120px;
+  }
+
+  @media (min-width: 1040px) {
+    .shell {
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr);
+      gap: 56px;
+      align-items: start;
+    }
+  }
+
+  /* ---- Contents rail ---- */
+  .rail { display: none; }
+
+  @media (min-width: 1040px) {
+    .rail {
+      display: block;
+      position: sticky;
+      top: 0;
+      max-height: 100vh;
+      overflow-y: auto;
+      padding: 40px 0 48px;
+      border-right: 1px solid var(--rule);
+      margin-right: -28px;
+      padding-right: 28px;
+    }
+  }
+
+  .rail-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 14px;
+  }
+
+  .rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+
+  .rail a {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 8px;
+    padding: 6px 8px 6px 0;
+    font-size: 13.5px;
+    line-height: 1.35;
+    text-decoration: none;
+    color: var(--ink-mid);
+    border-radius: 4px;
+    transition: color .15s, background .15s;
+  }
+  .rail a:hover { color: var(--ink); background: var(--tint); }
+  .rail a span:first-child {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-soft);
+    padding-top: 2px;
+  }
+
+  .rail-note {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+
+  main { min-width: 0; padding-top: 40px; }
+
+  /* ============================================================
+     Masthead
+     ============================================================ */
+  .masthead {
+    padding: 24px 0 44px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 44px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 18px;
+  }
+
+  .masthead h1 {
+    font-family: var(--display);
+    font-size: clamp(2.4rem, 6vw, 3.9rem);
+    line-height: 1.02;
+    letter-spacing: -.022em;
+    font-weight: 700;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+
+  .masthead .lede {
+    font-size: clamp(1.02rem, 2vw, 1.15rem);
+    line-height: 1.58;
+    color: var(--ink-mid);
+    max-width: 60ch;
+    margin: 0 0 32px;
+  }
+
+  .role-strip {
+    display: grid;
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  @media (min-width: 700px) { .role-strip { grid-template-columns: repeat(4, 1fr); } }
+
+  .role-strip > div {
+    background: var(--surface);
+    padding: 16px 16px 18px;
+    border-top: 3px solid var(--accent);
+  }
+  .role-strip h3 {
+    font-family: var(--display);
+    font-size: 1.02rem;
+    margin: 0 0 4px;
+    color: var(--accent);
+    letter-spacing: -.01em;
+  }
+  .role-strip p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+  .role-strip .who {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  /* ============================================================
+     Sections
+     ============================================================ */
+  section { margin-bottom: 76px; scroll-margin-top: 24px; }
+
+  .part-no {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  h2 {
+    font-family: var(--display);
+    font-size: clamp(1.55rem, 3.4vw, 2.05rem);
+    line-height: 1.14;
+    letter-spacing: -.018em;
+    font-weight: 700;
+    margin: 0 0 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rule-firm);
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: var(--display);
+    font-size: 1.24rem;
+    letter-spacing: -.012em;
+    line-height: 1.25;
+    margin: 40px 0 10px;
+    text-wrap: balance;
+  }
+
+  h4 {
+    font-size: .96rem;
+    font-weight: 650;
+    margin: 26px 0 8px;
+    letter-spacing: -.005em;
+  }
+
+  p, li { max-width: 68ch; }
+  p { margin: 0 0 15px; }
+
+  .section-lede {
+    font-size: 1.03rem;
+    color: var(--ink-mid);
+    margin-bottom: 26px;
+  }
+
+  ul, ol { padding-left: 20px; margin: 0 0 16px; }
+  li { margin-bottom: 7px; }
+  li::marker { color: var(--ink-soft); }
+
+  strong { font-weight: 650; }
+
+  code, .m {
+    font-family: var(--mono);
+    font-size: .86em;
+    background: var(--surface-2);
+    padding: .1em .38em;
+    border-radius: 3px;
+    border: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+
+  /* ---- Role chips ---- */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 20px; }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 3.5px 8px;
+    border-radius: 3px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .chip.patient { color: var(--patient); border-color: var(--patient); }
+  .chip.doctor  { color: var(--doctor);  border-color: var(--doctor); }
+  .chip.desk    { color: var(--desk);    border-color: var(--desk); }
+  .chip.admin   { color: var(--admin);   border-color: var(--admin); }
+  .chip.demo    { color: var(--ink-soft); border-color: var(--rule-firm); background: var(--surface-2); }
+
+  /* ---- Where-to-click breadcrumb ---- */
+  .path {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    background: var(--surface-2);
+    border-left: 2px solid var(--rule-firm);
+    padding: 8px 12px;
+    margin: 0 0 18px;
+    border-radius: 0 4px 4px 0;
+    overflow-x: auto;
+  }
+  .path b { color: var(--ink-mid); font-weight: 600; }
+
+  /* ---- Cards ---- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 22px 24px;
+    margin: 0 0 20px;
+    box-shadow: var(--shadow);
+  }
+  .card > :last-child { margin-bottom: 0; }
+  .card h4:first-child { margin-top: 0; }
+
+  .card.spine-patient { border-left: 3px solid var(--patient); }
+  .card.spine-doctor  { border-left: 3px solid var(--doctor); }
+  .card.spine-desk    { border-left: 3px solid var(--desk); }
+  .card.spine-admin   { border-left: 3px solid var(--admin); }
+
+  .grid-2 { display: grid; gap: 20px; }
+  @media (min-width: 760px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+  /* ---- Callouts ---- */
+  .note {
+    border-left: 3px solid var(--accent, var(--ink-soft));
+    background: var(--surface);
+    border-radius: 0 6px 6px 0;
+    padding: 14px 18px;
+    margin: 0 0 20px;
+    font-size: 14.5px;
+    line-height: 1.55;
+  }
+  .note > :last-child { margin-bottom: 0; }
+  .note .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--accent, var(--ink-soft));
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+  }
+  .note.warn { --accent: var(--warn); }
+  .note.crit { --accent: var(--crit); }
+  .note.info { --accent: var(--patient); }
+
+  /* ---- Numbered steps (a real sequence) ---- */
+  .steps { list-style: none; padding: 0; margin: 0 0 24px; counter-reset: s; }
+
+  .steps > li {
+    counter-increment: s;
+    position: relative;
+    padding: 0 0 26px 52px;
+    margin: 0;
+    max-width: none;
+    border-left: 1px solid var(--rule-firm);
+    margin-left: 15px;
+  }
+  .steps > li:last-child { border-left-color: transparent; padding-bottom: 0; }
+
+  .steps > li::before {
+    content: counter(s);
+    position: absolute;
+    left: -15px;
+    top: -2px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 1.5px solid var(--rule-firm);
+    color: var(--ink-mid);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .steps > li > h4 { margin: 2px 0 6px; font-family: var(--display); font-size: 1.1rem; font-weight: 700; }
+  .steps > li > p, .steps > li > ul { max-width: 66ch; }
+  .steps ul { margin-top: 8px; }
+
+  /* ---- Tables ---- */
+  .table-wrap { overflow-x: auto; margin: 0 0 24px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 520px; }
+
+  th, td {
+    text-align: left;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    line-height: 1.45;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    font-weight: 600;
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num, th.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.yes { color: var(--ok); font-weight: 600; }
+  td.no  { color: var(--ink-soft); }
+
+  /* ---- Status pills ---- */
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .06em;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .pill.sched { color: var(--doctor); }
+  .pill.live  { color: var(--crit); }
+  .pill.done  { color: var(--ok); }
+  .pill.void  { color: var(--ink-soft); }
+
+  /* ---- Screenshots ----
+     A screenshot is evidence, so it gets a frame that reads as a captured
+     window rather than an illustration: a title bar with the screen's own
+     name, and a caption that says what to look at. */
+  .shot {
+    margin: 0 0 26px;
+    border: 1px solid var(--rule-firm);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+
+  .shot-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .shot-bar::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--rule-firm);
+    box-shadow: 12px 0 0 var(--rule-firm), 24px 0 0 var(--rule-firm);
+    margin-right: 22px;
+    flex: none;
+  }
+  .shot-bar .role {
+    margin-left: auto;
+    letter-spacing: .1em;
+    color: var(--accent, var(--ink-soft));
+  }
+
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: var(--surface-2);
+  }
+
+  .shot figcaption {
+    padding: 11px 14px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: none;
+  }
+  .shot figcaption b { color: var(--ink-mid); font-weight: 600; }
+
+  /* ---- Diagram ---- */
+  figure { margin: 0 0 26px; }
+  .fig-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); padding: 20px 16px; }
+  .fig-scroll svg { display: block; min-width: 760px; width: 100%; height: auto; }
+  figcaption { font-size: 13px; color: var(--ink-soft); margin-top: 10px; line-height: 1.5; max-width: 68ch; }
+
+  .d-box   { fill: var(--surface-2); stroke: var(--rule-firm); stroke-width: 1; }
+  .d-box-a { fill: none; stroke: var(--patient); stroke-width: 1.5; }
+  .d-box-w { fill: none; stroke: var(--warn); stroke-width: 1.5; }
+  .d-t     { fill: var(--ink); font-family: var(--body); font-size: 13px; font-weight: 600; }
+  .d-s     { fill: var(--ink-soft); font-family: var(--body); font-size: 11.5px; }
+  .d-n     { fill: var(--ink-soft); font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; }
+  .d-lane  { fill: var(--ink-soft); font-family: var(--mono); font-size: 10px; letter-spacing: .14em; }
+  .d-line  { stroke: var(--rule-firm); stroke-width: 1.25; fill: none; }
+  .d-dash  { stroke: var(--rule-firm); stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+  .d-warn  { stroke: var(--warn); stroke-width: 1.25; fill: none; }
+
+  /* ---- Details ---- */
+  details {
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 0;
+    margin: 0 0 14px;
+  }
+  summary {
+    cursor: pointer;
+    padding: 13px 18px;
+    font-weight: 600;
+    font-size: 14.5px;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after {
+    content: "+";
+    font-family: var(--mono);
+    color: var(--ink-soft);
+    font-size: 16px;
+  }
+  details[open] summary::after { content: "\2212"; }
+  details > div { padding: 0 18px 16px; border-top: 1px solid var(--rule); padding-top: 14px; }
+  details > div > :last-child { margin-bottom: 0; }
+
+  /* ---- Definition rows ---- */
+  .dl { display: grid; gap: 0; margin: 0 0 20px; border-top: 1px solid var(--rule); }
+  .dl > div {
+    display: grid;
+    gap: 4px 24px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  @media (min-width: 640px) { .dl > div { grid-template-columns: 200px minmax(0, 1fr); } }
+  .dl dt { font-weight: 650; font-size: 14.5px; margin: 0; }
+  .dl dd { margin: 0; font-size: 14.5px; color: var(--ink-mid); }
+  .dl dd > :last-child { margin-bottom: 0; }
+
+  footer {
+    border-top: 2px solid var(--ink);
+    padding-top: 22px;
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    justify-content: space-between;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="shell">
+
+  <!-- ==================== CONTENTS RAIL ==================== -->
+  <nav class="rail" aria-label="Contents">
+    <p class="rail-title">Contents</p>
+    <ol>
+      <li><a href="#part-1"><span>1</span><span>The system at a glance</span></a></li>
+      <li><a href="#part-2"><span>2</span><span>Signing in</span></a></li>
+      <li><a href="#part-3"><span>3</span><span>Booking an appointment</span></a></li>
+      <li><a href="#part-4"><span>4</span><span>Patient manual</span></a></li>
+      <li><a href="#part-5"><span>5</span><span>Doctor manual</span></a></li>
+      <li><a href="#part-6"><span>6</span><span>Front desk manual</span></a></li>
+      <li><a href="#part-7"><span>7</span><span>Administrator manual</span></a></li>
+      <li><a href="#part-8"><span>8</span><span>Document Vault &amp; AI</span></a></li>
+      <li><a href="#part-9"><span>9</span><span>Telehealth room</span></a></li>
+      <li><a href="#part-10"><span>10</span><span>Reference tables</span></a></li>
+      <li><a href="#part-11"><span>11</span><span>Live vs. simulated</span></a></li>
+    </ol>
+    <p class="rail-note">Every feature below is tagged with the roles that can reach it. Grey <em>Demo</em> tags mark behaviour that is staged for demonstration rather than wired to a live service. Screenshots are captures of the running build.</p>
+  </nav>
+
+  <main>
+
+    <!-- ==================== MASTHEAD ==================== -->
+    <header class="masthead">
+      <p class="eyebrow">Operating manual &amp; walkthrough · neXgen Multispecialty Healthcare, New Delhi</p>
+      <h1>One OPD queue, four people who need it to work.</h1>
+      <p class="lede">
+        neXgen Healthcare is an outpatient appointment and patient-history hub. A patient reserves an
+        OPD slot online for <strong>₹50</strong> and settles the consultant's fee at the hospital;
+        the consultant sees a live queue with the full history attached; the front desk keeps the
+        roster and the money straight; the administrator sets the rules everyone else works inside.
+        This manual covers all four, feature by feature, and takes the booking flow apart step by step.
+        Every screenshot in it was captured from the running application.
+      </p>
+
+      <div class="role-strip">
+        <div style="--accent: var(--patient);">
+          <span class="who">Signs in as</span>
+          <h3>Patient</h3>
+          <p>Books and reschedules slots, joins video calls, keeps records and invoices, sets reminders.</p>
+        </div>
+        <div style="--accent: var(--doctor);">
+          <span class="who">Signs in as</span>
+          <h3>Consultant</h3>
+          <p>Works the day's queue, reads history, writes prescriptions, closes consultations.</p>
+        </div>
+        <div style="--accent: var(--desk);">
+          <span class="who">Signs in as</span>
+          <h3>Front Desk</h3>
+          <p>Registers patients, books on their behalf, collects fees, manages consultant availability.</p>
+        </div>
+        <div style="--accent: var(--admin);">
+          <span class="who">Signs in as</span>
+          <h3>Administrator</h3>
+          <p>Sets hospital details and tax, toggles SMS and telehealth, reseeds the system.</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- ==================== PART 1 ==================== -->
+    <section id="part-1">
+      <span class="part-no">Part One</span>
+      <h2>The system at a glance</h2>
+      <p class="section-lede">
+        Five ideas explain nearly everything the software does. Read these once and the rest of the
+        manual will follow without surprises.
+      </p>
+
+      <h3>Slots have capacity, not just a time</h3>
+      <p>
+        Every consultant publishes a list of <strong>time slots</strong> and a
+        <strong>maximum number of patients per slot</strong>. Dr. Rajesh Sharma runs six slots with
+        three patients each; Dr. Rohan Kapoor runs four slots with two each. A slot shows
+        <span class="m">3 left</span> until it fills, then <span class="m">Full</span>. The server
+        counts every non-cancelled booking for that exact consultant, date and slot, and refuses the
+        booking if the count has already reached the cap — so two people cannot take the last place
+        at the same moment.
+      </p>
+
+      <h3>Money splits in two</h3>
+      <p>
+        The <strong>₹50 booking fee</strong> is paid online and holds the slot. The
+        <strong>consultant's fee</strong> — ₹750 to ₹1,300 depending on the specialist — is paid at the
+        hospital reception on the day. Marking a visit as a follow-up takes <strong>20% off the
+        consultant's fee</strong>, never off the ₹50. The confirmation screen prints both numbers so
+        the patient knows exactly what cash to carry.
+      </p>
+
+      <h3>An appointment moves through four states</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>State</th><th>Set when</th><th>What it means on screen</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="pill sched">scheduled</span></td>
+              <td>Booking confirmed</td>
+              <td>Appears in the patient's upcoming list and the consultant's queue.</td>
+            </tr>
+            <tr>
+              <td><span class="pill live">active-video</span></td>
+              <td>Either side joins the video room</td>
+              <td>A pulsing <strong>Live</strong> badge appears in the sidebar under “In Session”.</td>
+            </tr>
+            <tr>
+              <td><span class="pill done">completed</span></td>
+              <td>Consultant closes the consultation</td>
+              <td>Drops to the bottom of the queue; prescription is filed to the vault.</td>
+            </tr>
+            <tr>
+              <td><span class="pill void">cancelled</span></td>
+              <td>Anyone cancels</td>
+              <td>Frees the place <em>and</em> alerts everyone waitlisted for that exact slot.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Cancelling is what feeds the waitlist</h3>
+      <p>
+        When a booking is cancelled, the system immediately finds every waitlist entry for that
+        consultant, date and slot, flips it from <em>waiting</em> to <em>notified</em>, and raises an
+        in-app alert. Anyone sitting on the booking screen sees a green
+        <strong>“A slot just opened up”</strong> banner within ten seconds. Nothing is reserved for
+        them — the banner's <strong>Take this slot</strong> button just pre-fills the booking form.
+        First to confirm wins.
+      </p>
+
+      <h3>The Document Vault is the shared spine</h3>
+      <p>
+        Lab reports, referrals, vaccine cards and prescriptions all live in one vault, filed against a
+        patient. Anything filed there is visible to that patient, to the consultant seeing them, and to
+        the desk. When a consultant closes a consultation, the prescription is written into the vault
+        automatically — that is what the patient downloads afterwards.
+      </p>
+    </section>
+
+    <!-- ==================== PART 2 ==================== -->
+    <section id="part-2">
+      <span class="part-no">Part Two</span>
+      <h2>Signing in</h2>
+      <p class="section-lede">
+        The sign-in screen has a four-way role selector. Choosing a role changes what the left
+        navigation rail offers after you are in.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar">Sign in<span class="role">All roles</span></div>
+        <img src="__SHOT:02-login-creds__" alt="The neXgen sign-in screen. A four-way role selector reads Patient, Doctor, Front Desk, Admin, with the Patient tab active. Below the email and password fields, an expanded panel lists the four sandbox accounts with one-click login buttons and their passwords." />
+        <figcaption>The role selector sits above the form. <b>Need demo login credentials?</b> expands the sandbox panel shown here — four one-click buttons and the matching passwords.</figcaption>
+      </figure>
+
+      <ol class="steps">
+        <li>
+          <h4>Pick your role portal</h4>
+          <p>Four tabs across the top: <strong>Patient</strong>, <strong>Doctor</strong>,
+          <strong>Front Desk</strong>, <strong>Admin</strong>. Selecting one shows a one-line
+          description of what that portal does and pre-fills the matching demo credentials.</p>
+        </li>
+        <li>
+          <h4>Enter email and password, or use one-click entry</h4>
+          <p>Open <strong>“Need demo login credentials?”</strong> at the bottom for the sandbox
+          accounts and four one-click buttons that skip the form entirely.</p>
+        </li>
+        <li>
+          <h4>You land on the Persona Portal</h4>
+          <p>Every role starts here. The left rail then shows only the destinations your role is
+          allowed to open — see the access matrix in <a href="#part-10">Part 10</a>.</p>
+        </li>
+      </ol>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Role</th><th>Email</th><th>Password</th><th>Signs in as</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Patient</td><td class="num">aarav.patel@gmail.com</td><td class="num">patient123</td><td>Aarav Patel, 34</td></tr>
+            <tr><td>Doctor</td><td class="num">dr.rajesh.sharma@nexgenhealth.in</td><td class="num">doctor123</td><td>Dr. Rajesh Sharma, Cardiology</td></tr>
+            <tr><td>Front Desk</td><td class="num">frontdesk@nexgenhealth.in</td><td class="num">frontdesk123</td><td>Priya Ananth</td></tr>
+            <tr><td>Admin</td><td class="num">admin@nexgenhealth.in</td><td class="num">admin123</td><td>System Admin</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note crit">
+        <span class="tag">Before you deploy this</span>
+        <p>These four accounts are hard-coded in the sign-in screen and the underlying API accepts
+        requests without any authentication at all. Role gating is a navigation filter, not a security
+        boundary — a signed-in patient cannot <em>see</em> the consultant queue, but nothing at the
+        server stops a request for it. Treat this build as a demonstration until real authentication
+        is added.</p>
+      </div>
+    </section>
+
+    <!-- ==================== PART 3 ==================== -->
+    <section id="part-3">
+      <span class="part-no">Part Three</span>
+      <h2>Booking an appointment, end to end</h2>
+      <div class="chips">
+        <span class="chip patient">Patient</span>
+        <span class="chip desk">Front Desk</span>
+        <span class="chip admin">Admin</span>
+      </div>
+      <p class="section-lede">
+        The central act of the product. Three steps of input, one confirmation screen, and a
+        capacity check at the server that decides whether the booking exists. Consultants do not book;
+        they receive.
+      </p>
+
+      <p class="path"><b>Left rail</b> → Scheduling → <b>Book Appointment</b></p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg viewBox="0 0 900 330" role="img" aria-labelledby="flow-title flow-desc">
+            <title id="flow-title">The four-step booking pipeline</title>
+            <desc id="flow-desc">Top lane shows the four screens the user works through: choose a doctor, pick date time and patient, review and pay fifty rupees, and the confirmation screen. Bottom lane shows what the server does at each stage: loads slot booking counts, validates the form, checks slot capacity and creates or reuses the patient profile, then returns the booking number and token.</desc>
+
+            <text class="d-lane" x="16" y="18">WHAT YOU DO</text>
+
+            <!-- Step 1 -->
+            <rect class="d-box-a" x="16" y="30" width="200" height="92" rx="6"/>
+            <text class="d-n" x="32" y="52">STEP 1</text>
+            <text class="d-t" x="32" y="72">Choose a doctor</text>
+            <text class="d-s" x="32" y="91">Search, filter by department,</text>
+            <text class="d-s" x="32" y="107">state, city, consult type</text>
+
+            <!-- Step 2 -->
+            <rect class="d-box-a" x="244" y="30" width="200" height="92" rx="6"/>
+            <text class="d-n" x="260" y="52">STEP 2</text>
+            <text class="d-t" x="260" y="72">Date, time &amp; patient</text>
+            <text class="d-s" x="260" y="91">Visit or video · next 7 days ·</text>
+            <text class="d-s" x="260" y="107">slot · who it's for</text>
+
+            <!-- Step 3 -->
+            <rect class="d-box-a" x="472" y="30" width="200" height="92" rx="6"/>
+            <text class="d-n" x="488" y="52">STEP 3</text>
+            <text class="d-t" x="488" y="72">Review &amp; pay ₹50</text>
+            <text class="d-s" x="488" y="91">Optional reports, notes,</text>
+            <text class="d-s" x="488" y="107">follow-up discount</text>
+
+            <!-- Step 4 -->
+            <rect class="d-box-a" x="700" y="30" width="184" height="92" rx="6"/>
+            <text class="d-n" x="716" y="52">STEP 4</text>
+            <text class="d-t" x="716" y="72">Confirmed</text>
+            <text class="d-s" x="716" y="91">Booking ID, token,</text>
+            <text class="d-s" x="716" y="107">reminders, tax invoice</text>
+
+            <!-- arrows top lane -->
+            <path class="d-line" d="M216 76 H236" marker-end="url(#ar)"/>
+            <path class="d-line" d="M444 76 H464" marker-end="url(#ar)"/>
+            <path class="d-line" d="M672 76 H692" marker-end="url(#ar)"/>
+
+            <!-- vertical connectors -->
+            <path class="d-dash" d="M116 122 V186"/>
+            <path class="d-dash" d="M344 122 V186"/>
+            <path class="d-dash" d="M572 122 V186"/>
+            <path class="d-dash" d="M792 186 V126" marker-end="url(#ar)"/>
+
+            <text class="d-lane" x="16" y="176">WHAT THE SYSTEM DOES</text>
+
+            <rect class="d-box" x="16" y="186" width="200" height="82" rx="6"/>
+            <text class="d-s" x="32" y="210">Lists consultants on file</text>
+            <text class="d-s" x="32" y="228">with fee, rating, years</text>
+            <text class="d-s" x="32" y="246">and video availability</text>
+
+            <rect class="d-box" x="244" y="186" width="200" height="82" rx="6"/>
+            <text class="d-s" x="260" y="210">Loads booked counts for</text>
+            <text class="d-s" x="260" y="228">that doctor and date, so</text>
+            <text class="d-s" x="260" y="246">each slot shows what's left</text>
+
+            <rect class="d-box" x="472" y="186" width="200" height="82" rx="6"/>
+            <text class="d-s" x="488" y="210">Re-checks capacity, creates</text>
+            <text class="d-s" x="488" y="228">or reuses the patient</text>
+            <text class="d-s" x="488" y="246">profile, records the fees</text>
+
+            <rect class="d-box" x="700" y="186" width="184" height="82" rx="6"/>
+            <text class="d-s" x="716" y="210">Returns booking no.,</text>
+            <text class="d-s" x="716" y="228">token and receipt; queue</text>
+            <text class="d-s" x="716" y="246">refreshes for the doctor</text>
+
+            <!-- full-slot branch -->
+            <path class="d-warn" d="M344 268 V296 H520" marker-end="url(#arw)"/>
+            <rect class="d-box-w" x="528" y="278" width="230" height="38" rx="6"/>
+            <text class="d-s" x="546" y="302" style="fill: var(--warn);">Slot full → join the waitlist instead</text>
+
+            <defs>
+              <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L8 4 L0 8 z" fill="var(--rule-firm)"/>
+              </marker>
+              <marker id="arw" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L8 4 L0 8 z" fill="var(--warn)"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
+        <figcaption>
+          The progress bar at the top of the wizard lets you jump <em>back</em> to any completed step,
+          but never forward past an incomplete one.
+        </figcaption>
+      </figure>
+
+      <h3>Step 1 — Choose a doctor</h3>
+      <p>
+        A search box matches on name, speciality or hospital. A department dropdown lists only the
+        departments actually staffed. <strong>More filters</strong> opens three more: state, city, and
+        consultation type (video / hospital visit only).
+      </p>
+      <p>
+        Each result card shows the photo, name, speciality, location, star rating, years of experience,
+        the consultant's fee, and a <strong>Video available</strong> tag where telehealth is offered.
+        Tap a card to select it — a tick appears in the corner — then <strong>Continue</strong>.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar">Book Appointment · Step 1<span class="role">Patient · Desk · Admin</span></div>
+        <img src="__SHOT:05-book-step1__" alt="Step 1 of the booking wizard. A progress bar reads Doctor, Date and time, Confirm. A search box and All departments dropdown sit above a grid of consultant cards. Dr. Rajesh Sharma is selected with a tick, showing 4.9 rating, 18 years experience, fee 1,200 rupees and a Video available tag." />
+        <figcaption>Seven consultants on file. The selected card is outlined and ticked; the bar pinned at the bottom repeats the selection and carries <b>Continue</b>.</figcaption>
+      </figure>
+      <div class="note info">
+        <span class="tag">If nothing matches</span>
+        <p>You get a <strong>Clear filters</strong> button rather than an empty page. Changing filters
+        so that the currently selected consultant disappears silently moves the selection to the first
+        remaining result.</p>
+      </div>
+
+      <h3>Step 2 — Date, time and patient</h3>
+      <p>Four decisions on one screen, top to bottom.</p>
+
+      <ol class="steps">
+        <li>
+          <h4>How would you like to consult?</h4>
+          <p><strong>Visit the hospital</strong> or <strong>Video call</strong>. The video option is
+          disabled and greyed out for consultants who do not offer it — Dr. Vikramaditya Verma and
+          Dr. Arvind Rao, in the seeded roster.</p>
+        </li>
+        <li>
+          <h4>Pick a day</h4>
+          <p>Seven tiles: today, tomorrow, then five weekdays by name. There is no way to book further
+          than a week out.</p>
+        </li>
+        <li>
+          <h4>Pick a time</h4>
+          <p>Each slot tile carries a live count — <span class="m">3 left</span>,
+          <span class="m">1 left</span>, <span class="m">Full</span>. Counts reload whenever you change
+          consultant or date. Selecting a full slot opens the waitlist panel instead of blocking you.</p>
+        </li>
+        <li>
+          <h4>Who is this appointment for?</h4>
+          <p>Choose a saved profile — which auto-fills name, age and mobile — or <strong>Someone
+          new</strong> and type all three. Name, age and mobile are all required to continue.</p>
+        </li>
+      </ol>
+
+      <figure class="shot">
+        <div class="shot-bar">Book Appointment · Step 2<span class="role">Patient · Desk · Admin</span></div>
+        <img src="__SHOT:06-book-step2__" alt="Step 2 of the booking wizard. Six time slots for Dr. Rajesh Sharma on Tuesday 4 August: 09:00 AM shows 2 left, the others show 3 left. The 11:00 AM slot is selected and highlighted. Below, the patient section has Aarav Patel chosen from a dropdown, auto-filling the full name, age 34 and mobile number." />
+        <figcaption>Live capacity under every slot — <b>2 left</b> on the 09:00 because one place is already taken. Choosing a saved profile auto-fills the three patient fields.</figcaption>
+      </figure>
+
+      <div class="card">
+        <h4>The waitlist branch</h4>
+        <p>
+          When the slot you picked is full, an amber panel appears with
+          <strong>Join the waitlist</strong>, plus a count of how many people are already waiting.
+          Joining needs the patient name filled in first. After that, the loop below runs on its own.
+        </p>
+
+        <figure class="shot" style="margin-top: 18px;">
+          <div class="shot-bar">Book Appointment · Step 2 · slot full<span class="role">Patient · Desk · Admin</span></div>
+          <img src="__SHOT:11-waitlist__" alt="The same step 2 time picker, but the 11:00 AM slot now reads Full and is outlined in amber. An amber panel below states 11:00 AM is fully booked, Join the waitlist and we'll notify you if someone cancels, with a Join the waitlist button and a collapsed Demo tools disclosure." />
+          <figcaption>Selecting a full slot does not block you — it opens the waitlist panel. <b>Demo tools</b> hides the simulate-a-cancellation button used to demonstrate the loop.</figcaption>
+        </figure>
+        <figure style="margin-top: 18px; margin-bottom: 0;">
+          <div class="fig-scroll">
+            <svg viewBox="0 0 900 176" role="img" aria-labelledby="wl-title wl-desc">
+              <title id="wl-title">The waitlist notification loop</title>
+              <desc id="wl-desc">You join the waitlist and your entry is marked waiting. Someone else cancels that exact slot. The server flips your entry to notified and creates an alert. Your booking screen polls every ten seconds and shows a slot-opened banner. Taking the slot pre-fills the booking form and returns you to step two, where you must still confirm before anyone else does.</desc>
+
+              <rect class="d-box-w" x="16" y="30" width="150" height="66" rx="6"/>
+              <text class="d-t" x="32" y="56">You join</text>
+              <text class="d-s" x="32" y="76">entry = waiting</text>
+
+              <rect class="d-box" x="198" y="30" width="150" height="66" rx="6"/>
+              <text class="d-t" x="214" y="56">Someone</text>
+              <text class="d-t" x="214" y="74">cancels</text>
+
+              <rect class="d-box" x="380" y="30" width="160" height="66" rx="6"/>
+              <text class="d-t" x="396" y="56">Server alerts</text>
+              <text class="d-s" x="396" y="76">entry = notified</text>
+
+              <rect class="d-box" x="572" y="30" width="150" height="66" rx="6"/>
+              <text class="d-t" x="588" y="56">Banner shows</text>
+              <text class="d-s" x="588" y="76">polled every 10s</text>
+
+              <rect class="d-box-a" x="754" y="30" width="130" height="66" rx="6"/>
+              <text class="d-t" x="770" y="56">Take this</text>
+              <text class="d-t" x="770" y="74">slot</text>
+
+              <path class="d-line" d="M166 63 H190" marker-end="url(#ar2)"/>
+              <path class="d-line" d="M348 63 H372" marker-end="url(#ar2)"/>
+              <path class="d-line" d="M540 63 H564" marker-end="url(#ar2)"/>
+              <path class="d-line" d="M722 63 H746" marker-end="url(#ar2)"/>
+
+              <path class="d-dash" d="M819 96 V134 H273 V102" marker-end="url(#ar2)"/>
+              <text class="d-s" x="300" y="152">Returns you to Step 2 with the doctor, date and slot already chosen — you still have to confirm.</text>
+
+              <defs>
+                <marker id="ar2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                  <path d="M0 0 L8 4 L0 8 z" fill="var(--rule-firm)"/>
+                </marker>
+              </defs>
+            </svg>
+          </div>
+        </figure>
+        <p style="margin-top: 16px;">
+          <span class="chip demo">Demo</span> &nbsp;A <strong>Simulate a cancellation</strong> button
+          sits inside the same panel so you can watch the whole loop run without a second browser: it
+          cancels a real booking in that slot and fires the alerts.
+        </p>
+      </div>
+
+      <h3>Step 3 — Review and pay</h3>
+      <p>
+        A four-row summary — doctor, when, where, patient — with an <strong>Edit</strong> link back to
+        step 2. Below it, everything optional is folded behind one disclosure so the default path stays
+        short.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar">Book Appointment · Step 3<span class="role">Patient · Desk · Admin</span></div>
+        <img src="__SHOT:07-book-step3-summary__" alt="Step 3 of the wizard. A card headed Your appointment lists Doctor, When, Where and Patient rows with an Edit link. Below, a collapsed section reads Add reports or notes, Optional — follow-up discount, test reports, symptoms — and the first control inside is a checkbox, This is a follow-up visit, saves 20% on the doctor's fee." />
+        <figcaption>Everything optional collapses into one disclosure. The follow-up checkbox is the only control here that changes what you pay.</figcaption>
+      </figure>
+
+      <h4>Add reports or notes <span style="font-weight: 400; color: var(--ink-soft);">— optional</span></h4>
+      <ul>
+        <li><strong>This is a follow-up visit</strong> — takes 20% off the consultant's fee and reveals
+        a field for the previous booking ID.</li>
+        <li><strong>Test reports</strong> and <strong>Past prescriptions</strong> — PDF, JPG, PNG or
+        DOC. <span class="chip demo">Demo</span> Only the file names travel with the booking; the file
+        contents are not uploaded. To attach a real document, use the Document Vault
+        (<a href="#part-8">Part 8</a>).</li>
+        <li><strong>What brings you in?</strong> — free text that lands in the consultant's notes
+        field for this appointment.</li>
+        <li><strong>How urgent is it?</strong> — Routine, Urgent, or Emergency.</li>
+      </ul>
+
+      <h4>How would you like to pay the ₹50?</h4>
+      <p>
+        <strong>UPI</strong> (GPay, PhonePe, Paytm, BHIM), <strong>Card</strong>,
+        <strong>Net banking</strong> from five banks, or <strong>At the counter</strong> — which still
+        holds the slot immediately and asks you to pay at reception quoting your booking number.
+      </p>
+      <p>
+        The payment box then states both figures plainly: <strong>₹50 now</strong>, and the
+        consultant's fee to carry to the hospital — struck through and reduced if the follow-up box is
+        ticked. Underneath the confirm button: <em>free cancellation up to 2 hours before</em>.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar">Book Appointment · Step 3 · payment<span class="role">Patient · Desk · Admin</span></div>
+        <img src="__SHOT:08-book-step3-pay__" alt="The payment section headed How would you like to pay the 50 rupees. Four methods: UPI selected, Card, Net banking, At the counter. A UPI ID field reads patient@okaxis. Below, two lines: Booking fee pay now, 50 rupees; and Doctor's fee pay at the hospital with a 20% follow-up discount applied, showing 1,200 struck through and 960 payable. The confirm button reads Pay 50 rupees and confirm booking." />
+        <figcaption>The split, stated at the moment of payment: <b>₹50</b> online, <b>₹960</b> at reception. The discount applies to the consultant's fee only — the ₹50 never changes.</figcaption>
+      </figure>
+
+      <h3>Step 4 — Confirmed</h3>
+      <p>The confirmation screen is also the receipt and the settings page for the visit.</p>
+
+      <figure class="shot">
+        <div class="shot-bar">Book Appointment · Step 4<span class="role">Patient · Desk · Admin</span></div>
+        <img src="__SHOT:09-book-step4__" alt="The confirmation screen. A green panel reads Your appointment is booked, Dr. Rajesh Sharma, Tue 4 August at 11:00 AM, with Booking ID BK-NXG-949751 and a copy button, and the line Please arrive 15 minutes early and carry 960 rupees for the doctor's fee. Below sit two panels: Reminders, with timing options and WhatsApp, SMS, Email and App channels; and On the day, showing Running on time and an alert-me-about-delays checkbox." />
+        <figcaption>Confirmation, receipt and per-visit settings on one screen. Note the arrival line quotes the discounted <b>₹960</b>, not the list fee.</figcaption>
+      </figure>
+
+      <dl class="dl">
+        <div>
+          <dt>Booking ID</dt>
+          <dd>Format <span class="m">BK-NXG-######</span>, with a copy button. Quote it at reception
+          and when rescheduling.</dd>
+        </div>
+        <div>
+          <dt>Arrival instruction</dt>
+          <dd>Arrive 15 minutes early, and the exact rupee amount to carry for the consultant's fee.</dd>
+        </div>
+        <div>
+          <dt>Reminders</dt>
+          <dd>Choose the timing — 1 hour, 3 hours, 12 hours or a day before — and the channel:
+          WhatsApp, SMS, Email or in-app. <span class="chip demo">Demo</span> <strong>Send a test
+          reminder</strong> shows the message as an on-screen toast; nothing is actually dispatched.</dd>
+        </div>
+        <div>
+          <dt>On the day</dt>
+          <dd>A live status line for your consultant — running on time, 20 minutes behind, 45 minutes
+          behind, or called to emergency duty — with a toggle to be alerted if the wait exceeds 15
+          minutes. <span class="chip demo">Demo</span> The two <em>Simulate</em> buttons drive this
+          status locally.</dd>
+        </div>
+        <div>
+          <dt>Tax invoice</dt>
+          <dd>A full printable invoice — hospital name and GSTIN, invoice number
+          <span class="m">INV-BK-NXG-######</span>, doctor block, patient and schedule block, and the
+          amount paid.</dd>
+        </div>
+      </dl>
+
+      <figure class="shot">
+        <div class="shot-bar">Book Appointment · Step 4 · tax invoice<span class="role">Patient · Desk · Admin</span></div>
+        <img src="__SHOT:10-invoice__" alt="The printable tax invoice on the confirmation screen. Header reads neXgen Multispecialty Healthcare with the Dwarka address and GSTIN, invoice number INV-BK-NXG-949751. Doctor and Patient and schedule blocks sit above a line-item table: Online slot booking fee 50 rupees; Doctor consultation fee payable at OPD desk with 20% follow-up discount, 960 rupees; GST 0; Paid online today 50 rupees." />
+        <figcaption>The booking receipt lists the consultant's fee for reference but bills only the ₹50. <b>GST is ₹0 here</b> — the 18% rate applies to the consultation invoice, not the booking fee.</figcaption>
+      </figure>
+
+      <div class="note warn">
+        <span class="tag">No OPD token is issued at booking</span>
+        <p>
+          The wizard generates a token number but the server does not store it, so the confirmation
+          screen shows the booking ID alone — there is no token to quote. A token is only ever
+          rendered by the front desk's check-in QR pass, and it is derived from the appointment ID as
+          <span class="m">Token #BK-&lt;last 4&gt;</span>. Patients should quote the
+          <strong>booking ID</strong> at reception.
+        </p>
+      </div>
+
+      <h3>Two variants of the same wizard</h3>
+
+      <div class="grid-2">
+        <div class="card spine-patient">
+          <h4>Rescheduling</h4>
+          <p>
+            Opened from the Care Dashboard, the wizard launches as a modal titled
+            <strong>Reschedule appointment</strong>, jumps straight to step 2, and carries the patient
+            details, consultant and appointment type across. The notes field is stamped
+            <span class="m">[Rescheduled from #BK-…]</span> and the follow-up box is pre-ticked.
+          </p>
+          <p><strong>The old booking is cancelled only once the new one is confirmed</strong> — which
+          also releases the old slot to its waitlist.</p>
+        </div>
+        <div class="card spine-desk">
+          <h4>Booking on someone's behalf</h4>
+          <p>
+            The front desk and admin see the same <strong>Book Appointment</strong> item in the rail
+            and use the identical wizard. At step 2 they either pick the patient from the saved list or
+            choose <strong>Someone new</strong> and type the details.
+          </p>
+          <p>If the name and mobile match an existing profile, the booking attaches to it; otherwise a
+          new patient profile is created automatically at confirmation.</p>
+        </div>
+      </div>
+
+      <h3>What can go wrong, and what the message means</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Message</th><th>Cause</th><th>What to do</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Please choose a doctor to continue.</td>
+              <td>Step 1 was left without a selection.</td>
+              <td>Tap a consultant card.</td>
+            </tr>
+            <tr>
+              <td>Please choose a time for the appointment.</td>
+              <td>No slot selected, or the date was changed after selecting one — changing date clears the slot.</td>
+              <td>Re-select a time.</td>
+            </tr>
+            <tr>
+              <td>Please fill in the patient name, age and mobile number.</td>
+              <td>One of the three required patient fields is empty.</td>
+              <td>Complete all three.</td>
+            </tr>
+            <tr>
+              <td>Slot is fully booked. Only N schedules allowed per slot for Dr. X.</td>
+              <td>The slot filled between loading the screen and confirming.</td>
+              <td>Go back a step, pick another time, or join the waitlist.</td>
+            </tr>
+            <tr>
+              <td>Network communication failure.</td>
+              <td>The API did not respond.</td>
+              <td>Check the server, then retry — nothing was saved.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== PART 4 ==================== -->
+    <section id="part-4">
+      <span class="part-no">Part Four</span>
+      <h2>Patient manual</h2>
+      <div class="chips"><span class="chip patient">Patient</span></div>
+      <p class="section-lede">
+        Patients see three destinations in the left rail: <strong>Persona Portal</strong>,
+        <strong>Book Appointment</strong> and <strong>Document Vault</strong>. The portal is the home
+        base and splits into three tabs.
+      </p>
+
+      <p class="path"><b>Left rail</b> → Care → <b>Persona Portal</b></p>
+
+      <figure class="shot" style="--accent: var(--patient);">
+        <div class="shot-bar">Persona Portal<span class="role">Patient</span></div>
+        <img src="__SHOT:03-portal-patient__" alt="The patient's Persona Portal. A header bar reads Patient session active, Aarav Patel, Persona locked and verified. Three tabs: Upcoming Appointments and Reminders, Patient Profiles and Vitals, Historic Records and Tax Invoices. A profile strip shows the ABHA ID and a Switch Family Profile dropdown. Below, a confirmed consultation card for Dr. Rajesh Sharma shows the slot, a paid consultation fee, and an amber banner reading No custom reminder configured with a Set Reminder button." />
+        <figcaption><b>Switch Family Profile</b> re-points the whole tab at another person on the account — how one login covers a child or an elderly parent.</figcaption>
+      </figure>
+
+      <h3>Tab 1 — Upcoming appointments &amp; reminders</h3>
+      <div class="card spine-patient">
+        <p>Each upcoming visit is a card carrying the consultant, date, slot, type and status, plus:</p>
+        <ul>
+          <li><strong>Set Reminder / Change</strong> — opens a panel with five timings (15 minutes, 1
+          hour, 3 hours, 12 hours, 1 day before) and four channels (WhatsApp, SMS, Email, browser
+          push), with fields for the mobile number and email to use. A <strong>Test Alert</strong>
+          button confirms the settings. <span class="chip demo">Demo</span></li>
+          <li><strong>Pay Fee (₹…)</strong> — opens the secure checkout with the consultation fee, 18%
+          GST and total, and card fields.</li>
+          <li><strong>Join Room</strong> — appears only on video appointments; takes you into the
+          telehealth cabin (<a href="#part-9">Part 9</a>).</li>
+        </ul>
+        <p>Below the cards, a table lists every upcoming visit across <em>all</em> family profiles,
+        with its reminder status at a glance and a <strong>Configure Alert</strong> shortcut per row.
+        A <strong>Sync Google Cal</strong> action sits on each appointment card.</p>
+      </div>
+
+      <figure class="shot" style="--accent: var(--patient);">
+        <div class="shot-bar">Configure appointment reminder<span class="role">Patient</span></div>
+        <img src="__SHOT:04-reminder-modal__" alt="A modal headed Configure Appointment Reminder. It names Dr. Rajesh Sharma and the slot 2026-08-03 at 03:00 PM. Alert frequency options are 15 Mins Before, 1 Hour Before which is selected, 3 Hours Before, 12 Hours Before and 1 Day Before. Below, notification delivery channels begin with WhatsApp, described as instant WhatsApp message, and SMS Text, described as direct mobile SMS alert." />
+        <figcaption>Five lead times and four channels, per appointment. This panel offers <b>15 minutes before</b>, which the booking wizard's own reminder block does not.</figcaption>
+      </figure>
+
+      <h3>Tab 2 — Patient profiles &amp; vitals</h3>
+      <div class="card spine-patient">
+        <p>
+          The clinical picture the consultant will see: known allergies and sensitivities, active
+          prescriptions and medications, medical conditions, emergency contact and guardian, ABHA ID
+          and blood group where recorded, and a count of invoices settled.
+        </p>
+        <p>
+          <strong>Register Patient</strong> in the header creates an additional profile — for a child
+          or an elderly parent — so one account can manage a family. The <strong>Active Patient
+          Picker</strong> switches which profile the whole tab is showing.
+        </p>
+      </div>
+
+      <h3>Tab 3 — Historic records &amp; tax invoices</h3>
+      <div class="card spine-patient">
+        <p>Every past appointment, filterable by <strong>All</strong>, <strong>Upcoming / Active</strong>,
+        <strong>Completed</strong> and <strong>Cancelled</strong>, with payment status per row and these actions:</p>
+        <ul>
+          <li><strong>Pay Online</strong> on anything still unpaid.</li>
+          <li><strong>Tax Invoice</strong> — opens the printable receipt: hospital details, patient and
+          consultant blocks, line items, subtotal, clinic tax and total settled. <strong>Print
+          Bill</strong> sends it to the printer or a PDF.</li>
+          <li><strong>Join Room</strong> for a video visit still in progress.</li>
+          <li><strong>Feedback</strong> on completed visits — a 1-to-5 star rating and written comments
+          on the consultant.</li>
+        </ul>
+      </div>
+
+      <figure class="shot" style="--accent: var(--patient);">
+        <div class="shot-bar">Historic records &amp; tax invoices<span class="role">Patient</span></div>
+        <img src="__SHOT:20-patient-invoices__" alt="The patient's historic records table. Status filters read All Records, Upcoming slash Active, Completed, Cancelled. Columns are Booking ref and date, Specialist consultant, Consultation type, Base fee, GST tax 18 percent, Total amount, Payment status, and Invoice and actions. Rows show a Telehealth Video appointment at 1,200 base, 216 GST, 1,416 total, marked UNPAID with a Pay Online button; and two In-Person OPD rows marked PAID with Tax Invoice buttons." />
+        <figcaption>This is where the <b>18% GST</b> appears: ₹1,200 base becomes ₹1,416. Unpaid rows offer <b>Pay Online</b>; settled rows offer <b>Tax Invoice</b>.</figcaption>
+      </figure>
+
+      <div class="note info">
+        <span class="tag">Two different money screens</span>
+        <p>The ₹50 booking receipt from step 4 and the consultation invoice here are separate
+        documents. The booking receipt charges ₹50 with no GST; this table bills the consultant's fee
+        with 18% GST added. A patient who has paid at the reception desk may still see
+        <strong>UNPAID</strong> here until the desk settles the invoice in the system.</p>
+      </div>
+
+      <h3>Cancelling</h3>
+      <p>
+        Cancelling asks for confirmation first, then releases the slot and triggers the waitlist alerts
+        described in <a href="#part-1">Part 1</a>. The stated policy on the payment screen is free
+        cancellation up to two hours before the appointment.
+      </p>
+    </section>
+
+    <!-- ==================== PART 5 ==================== -->
+    <section id="part-5">
+      <span class="part-no">Part Five</span>
+      <h2>Doctor manual</h2>
+      <div class="chips"><span class="chip doctor">Consultant</span></div>
+      <p class="section-lede">
+        Consultants get <strong>Persona Portal</strong>, <strong>Consultations</strong>,
+        <strong>Clinical Patients</strong> and <strong>Document Vault</strong>. They cannot open the
+        booking wizard — scheduling belongs to patients and the desk.
+      </p>
+
+      <h3>The consultation queue</h3>
+      <p class="path"><b>Left rail</b> → Care → <b>Consultations</b></p>
+
+      <div class="card spine-doctor">
+        <p>
+          A two-column workspace. On the left, your queue — filtered to <strong>Today</strong> or
+          <strong>Upcoming</strong>, cancellations hidden, sorted so anyone still to be seen floats
+          above finished consultations, then by date and slot time. A counter reads
+          <em>“N waiting”</em>. On the right, everything about the patient currently selected.
+        </p>
+        <p>The right-hand panel gives you, before you say a word:</p>
+        <ul>
+          <li>Age, contact, appointment type and the note the patient wrote at booking.</li>
+          <li>Known allergies, current medications and recorded conditions.</li>
+          <li>The last four completed visits.</li>
+          <li>Every document on file for them, newest first.</li>
+        </ul>
+      </div>
+
+      <figure class="shot" style="--accent: var(--doctor);">
+        <div class="shot-bar">Consultations · queue<span class="role">Consultant</span></div>
+        <img src="__SHOT:12-doctor-queue__" alt="The consultant's queue screen. A Today and Upcoming toggle sits top right. The left column lists numbered patients by slot time, with completed ones ticked and greyed at the bottom. The right side shows Aarav Patel, 34, male, with an In person tag and 11:00 AM. Panels below read Reported symptoms; On file, listing allergies Penicillin and Dust Mites, current medicines Telmisartan 40mg, and conditions Stage 1 Essential Hypertension and Mild Seasonal Asthma; and Documents and reports with three prescriptions and lab reports." />
+        <figcaption>Allergies, current medicines, conditions and every filed document — all on screen before the consultation starts. Finished patients sink to the bottom of the queue.</figcaption>
+      </figure>
+
+      <h3>Writing the prescription</h3>
+      <ol class="steps">
+        <li>
+          <h4>Diagnosis</h4>
+          <p>One line — <em>e.g. Stage 1 essential hypertension</em>.</p>
+        </li>
+        <li>
+          <h4>Examination notes</h4>
+          <p>Findings, observations, vitals discussed.</p>
+        </li>
+        <li>
+          <h4>Prescription — one row per medicine</h4>
+          <p>Four columns per row: <strong>medicine</strong>, <strong>dose</strong>
+          (<em>40mg</em>), <strong>frequency</strong> (<em>Once daily, morning</em>) and
+          <strong>duration</strong> (<em>30 days</em>). <strong>Add medicine</strong> appends a row; the
+          cross removes one. A running count sits above the rows.</p>
+        </li>
+        <li>
+          <h4>Advice &amp; follow-up</h4>
+          <p><em>e.g. Low-salt diet, walk 30 min daily. Review in 12 weeks with a fresh lipid profile.</em></p>
+        </li>
+        <li>
+          <h4>Review &amp; complete</h4>
+          <p>A review dialog shows the prescription exactly as the patient will receive it, with a
+          print / save-as-PDF button. <kbd>Esc</kbd> backs out.</p>
+        </li>
+      </ol>
+
+      <figure class="shot" style="--accent: var(--doctor);">
+        <div class="shot-bar">Consultations · consultation record<span class="role">Consultant</span></div>
+        <img src="__SHOT:13-prescription__" alt="The consultation record form. Fields in order: Diagnosis, with placeholder Stage 1 essential hypertension; Examination notes, with placeholder findings, observations, vitals discussed; Prescription, showing zero medicines and one empty row with columns Medicine, 40mg, Once daily morning, and 30 days, plus an Add medicine button. Beneath the row a red warning reads Allergic to Sulfa Drugs — check before prescribing. Then Advice and follow-up, and a footer reading You'll see the prescription before it is saved to Suresh Kumar's profile, with a Review and complete button." />
+        <figcaption>The red line under the medicine rows is a live allergy check drawn from the patient's record — it names the specific allergy before you prescribe.</figcaption>
+      </figure>
+
+      <div class="note crit">
+        <span class="tag">Allergy warning</span>
+        <p>The prescription block reads the patient's recorded allergies and warns beneath the medicine
+        rows — <em>“Allergic to Sulfa Drugs — check before prescribing.”</em> It is an advisory only:
+        it does not match against what you have typed and will not stop you saving. Keeping the allergy
+        list in Clinical Patients accurate is what makes this warning worth anything.</p>
+      </div>
+
+      <div class="note info">
+        <span class="tag">What closing a consultation actually does</span>
+        <p>Four things, in order: the appointment is marked <span class="pill done">completed</span>;
+        every new medicine is appended to the patient's medication list; a dated summary of the
+        diagnosis, notes and advice is appended to their clinical record; and the full prescription is
+        filed into the Document Vault as <span class="m">Prescription — Dr. X — YYYY-MM-DD</span>, which
+        is what the patient downloads. The queue then advances to the next waiting patient
+        automatically.</p>
+        <p>You cannot close a consultation empty — a diagnosis, a note, or at least one medicine is
+        required.</p>
+      </div>
+
+      <h3>Three ways to read your day</h3>
+      <p class="path"><b>Left rail</b> → Care → <b>Persona Portal</b> → <b>Doctor Scheduler Dashboard</b></p>
+      <div class="grid-2">
+        <div class="card spine-doctor">
+          <h4>Slot-Wise Patients</h4>
+          <p>Your published slots down the page, with the patients booked into each. The default, and
+          the closest match to how an OPD actually runs.</p>
+        </div>
+        <div class="card spine-doctor">
+          <h4>Chronological Timeline</h4>
+          <p>One continuous run of appointments in time order, regardless of slot boundaries.</p>
+        </div>
+        <div class="card spine-doctor">
+          <h4>Standard Checklist</h4>
+          <p>A flat, tickable list — fastest for confirming that everyone has been seen.</p>
+        </div>
+        <div class="card spine-doctor">
+          <h4>Joining a video patient</h4>
+          <p>Video appointments carry a <strong>Join Telehealth</strong> button in every view. Pressing
+          it flips the appointment to <span class="pill live">active-video</span> and opens the cabin.</p>
+        </div>
+      </div>
+
+      <h3>Clinical Patients</h3>
+      <p class="path"><b>Left rail</b> → Records → <b>Clinical Patients</b></p>
+      <div class="card spine-doctor">
+        <p>
+          The longitudinal record, searchable by name or phone. For each patient you can edit the
+          demographics, and maintain three managed lists — <strong>allergies</strong>,
+          <strong>medications</strong> and <strong>conditions</strong> — as removable tags rather than
+          free text, plus a clinical notes field for surgical history and background.
+        </p>
+        <h4>Vitals tracking</h4>
+        <p>Readings are charted across three metric groups you switch between:</p>
+        <ul>
+          <li><strong>BP &amp; pulse</strong> — systolic, diastolic, pulse.</li>
+          <li><strong>Glucose &amp; SpO₂</strong>.</li>
+          <li><strong>Haemoglobin</strong>.</li>
+        </ul>
+        <p>Add a reading by date; delete any reading from the table.</p>
+      </div>
+    </section>
+
+    <!-- ==================== PART 6 ==================== -->
+    <section id="part-6">
+      <span class="part-no">Part Six</span>
+      <h2>Front desk manual</h2>
+      <div class="chips"><span class="chip desk">Front Desk</span></div>
+      <p class="section-lede">
+        The widest access in the building. The desk sees every rail destination except none — portal,
+        consultations, care dashboard, booking, clinical patients and the vault — because it stands in
+        for whoever is not at a screen.
+      </p>
+
+      <p class="path"><b>Left rail</b> → Care → <b>Persona Portal</b> → three tabs</p>
+
+      <h3>Tab 1 — Clinic performance &amp; revenue</h3>
+      <div class="card spine-desk">
+        <p>Four headline figures across the top:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Figure</th><th>Counts</th></tr></thead>
+            <tbody>
+              <tr><td>Consulting revenue</td><td>Sum of settled invoices, in rupees</td></tr>
+              <tr><td>Total bookings</td><td>Every booking that is not cancelled</td></tr>
+              <tr><td>Completed care</td><td>Appointments the consultant has closed</td></tr>
+              <tr><td>Patient directory</td><td>Distinct profiles on file</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Below them, two charts: <strong>Financial statement — total consultation inflows over
+        time</strong>, and <strong>Capacity monitoring — appointment volumes by calendar date</strong>.</p>
+      </div>
+
+      <figure class="shot" style="--accent: var(--desk);">
+        <div class="shot-bar">Persona Portal · clinic performance<span class="role">Front Desk</span></div>
+        <img src="__SHOT:14-desk-analytics__" alt="The front desk portal. A header reads Hospital session active, Priya Ananth, Front Desk. Three tabs: Clinic Performance and Revenue selected, Clinician Availabilities, and Onboard Specialist. Four figures across the page: Consulting Revenue 1,350 rupees, Total Bookings 9, Completed Care, and Patient Directory 4. Two chart panels below are headed Financial Statement, total consultation inflows over time, and Capacity Monitoring, appointment volumes by calendar date." />
+        <figcaption>The desk's three tabs run across the top. Revenue counts settled invoices only, so it trails the booking count.</figcaption>
+      </figure>
+
+      <h3>Tab 2 — Clinician availabilities</h3>
+      <div class="card spine-desk">
+        <p>
+          A roster table: specialist, consult fee, whether video is on, duty status
+          (<strong>Active</strong> or <strong>On Leave</strong>) and the published slots as chips.
+        </p>
+        <p><strong>Update Availability</strong> opens an editor for three settings:</p>
+        <ul>
+          <li><strong>Consultation fee (₹)</strong> — the amount collected at reception, and the number
+          the booking wizard quotes.</li>
+          <li><strong>On-duty status</strong> — <em>Active &amp; booking available</em> or <em>On leave
+          / temporarily blocked</em>.</li>
+          <li><strong>Telehealth video consultations</strong> — enabled, or in-person only. Turning this
+          off greys out the video option in the booking wizard immediately.</li>
+        </ul>
+        <div class="note warn" style="margin-top: 4px;">
+          <span class="tag">Take care</span>
+          <p>These changes are live and apply to bookings made from that moment on. Existing bookings
+          keep the fee and type they were made under.</p>
+        </div>
+      </div>
+
+      <figure class="shot" style="--accent: var(--desk);">
+        <div class="shot-bar">Persona Portal · clinician availabilities<span class="role">Front Desk</span></div>
+        <img src="__SHOT:15-desk-availability__" alt="The on-duty management table. Columns are Specialist, Consult Fee, Video Consults, Duty Status, Scheduled Slots and Actions. Rows list each consultant with their fee, an Enabled or Disabled video state, an ACTIVE badge, their published slot times as small chips, and an Update Availability button." />
+        <figcaption>The whole roster on one screen. <b>Update Availability</b> opens the fee, on-duty and video editor for that consultant.</figcaption>
+      </figure>
+
+      <h3>Tab 3 — Onboard specialist</h3>
+      <div class="card spine-desk">
+        <p>
+          Adds a consultant to the roster: name, speciality, fee, biography, photo, whether video is
+          offered, and the list of slots. A new consultant defaults to
+          <strong>three patients per slot</strong> and to the standard set
+          <span class="m">09:00 AM · 10:00 AM · 02:00 PM · 04:00 PM</span> if no slots are given. They
+          become bookable straight away.
+        </p>
+      </div>
+
+      <h3>The Care Dashboard</h3>
+      <p class="path"><b>Left rail</b> → Care → <b>Care Dashboard</b></p>
+      <figure class="shot" style="--accent: var(--desk);">
+        <div class="shot-bar">Care Dashboard<span class="role">Front Desk · Admin</span></div>
+        <img src="__SHOT:16-dashboard__" alt="The Care Dashboard. A dark hero panel headed Clinical Portal and Care Center sits above four summary tiles, then two columns headed Upcoming Appointments and Health Insights." />
+        <figcaption>Hospital-wide totals over the upcoming list. Per-row actions sit on each appointment card.</figcaption>
+      </figure>
+
+      <div class="card spine-desk">
+        <p>
+          Hospital-wide totals — appointments, active patients, documents held, and how many of those
+          documents have been analysed — over a list of upcoming appointments. Each row offers:
+        </p>
+        <ul>
+          <li><strong>Reschedule</strong> — opens the booking wizard as a modal, pre-filled
+          (<a href="#part-3">Part 3</a>).</li>
+          <li><strong>Cancel</strong> — with confirmation; releases the slot to its waitlist.</li>
+          <li><strong>Share booking link &amp; check-in QR</strong> — generates a scannable QR code and
+          a copyable check-in link carrying the appointment and booking number, for the OPD
+          registration desk or kiosk.</li>
+        </ul>
+        <p>Alongside: a health-insights panel and a featured-specialists strip.</p>
+      </div>
+
+      <figure class="shot" style="--accent: var(--desk);">
+        <div class="shot-bar">Care Dashboard · check-in QR<span class="role">Front Desk · Admin</span></div>
+        <img src="__SHOT:17-qr-checkin__" alt="A modal over the Care Dashboard headed Share Booking Link and Check-In QR, subtitled Fast-track OPD queue check-in pass for patient. A summary box shows Suresh Kumar with a token chip reading Token hash BK dash dash 203, doctor Dr. Rajesh Sharma, Senior Consultant Cardiologist, dated Aug 5 2026 at 11:00 AM. A large QR code sits below." />
+        <figcaption>The only place a token is shown. It is derived from the appointment ID — here <b>Token #BK--203</b> for appointment <span class="m">appt-201</span> — not from anything the patient was given at booking.</figcaption>
+      </figure>
+
+      <h3>Collecting money</h3>
+      <div class="card spine-desk">
+        <p>
+          The desk collects the consultant's fee in person and can settle any unpaid invoice through
+          the same checkout the patient sees, then print the receipt. The invoice applies the clinic
+          tax rate the administrator has configured — <strong>18% GST</strong> as shipped — on top of
+          the consultation fee.
+        </p>
+      </div>
+    </section>
+
+    <!-- ==================== PART 7 ==================== -->
+    <section id="part-7">
+      <span class="part-no">Part Seven</span>
+      <h2>Administrator manual</h2>
+      <div class="chips"><span class="chip admin">Administrator</span></div>
+      <p class="section-lede">
+        The administrator can reach every screen in the product, and owns two things nobody else
+        touches: the hospital's own details, and the switches that change how the application behaves
+        for everyone.
+      </p>
+
+      <p class="path"><b>Left rail</b> → Care → <b>Persona Portal</b> → <b>Admin Settings</b></p>
+
+      <figure class="shot" style="--accent: var(--admin);">
+        <div class="shot-bar">Persona Portal · admin settings<span class="role">Administrator</span></div>
+        <img src="__SHOT:18-admin__" alt="The administrator settings screen. A panel headed Hospital Metadata Setup holds four fields: Hospital Name reading neXgen Multispecialty Healthcare Institute New Delhi, Billing Tax Rate 18, Contact Hotline, and Global Address Location. Below, Application Level Configurations shows two ticked toggles: Simulate Care SMS Triggers, and Enable Telehealth WebRTC Rooms. A Save Global Configuration button sits at the bottom right. A separate panel headed Administrative Actions holds a red Purge and Seed System Databases button." />
+        <figcaption>Everything on this screen is global. The red button on the right is the only destructive control in the product.</figcaption>
+      </figure>
+
+      <h3>Hospital metadata</h3>
+      <div class="card spine-admin">
+        <dl class="dl" style="margin-bottom: 0; border-top: 0;">
+          <div>
+            <dt>Hospital name</dt>
+            <dd>Prints on every invoice, receipt and prescription. Ships as <em>neXgen Multispecialty
+            Healthcare Institute, New Delhi</em>.</dd>
+          </div>
+          <div>
+            <dt>Billing tax rate (%)</dt>
+            <dd>Applied to consultation fees on invoices and in the checkout breakdown. Ships at
+            <span class="m">18</span>.</dd>
+          </div>
+          <div>
+            <dt>Contact hotline</dt>
+            <dd>Printed on receipts for patient queries.</dd>
+          </div>
+          <div>
+            <dt>Global address</dt>
+            <dd>The address block on printed documents.</dd>
+          </div>
+        </dl>
+      </div>
+
+      <h3>Application-level configuration</h3>
+      <div class="grid-2">
+        <div class="card spine-admin">
+          <h4>Care SMS triggers</h4>
+          <p>Whether patient notifications fire on bookings and prescriptions.
+          <span class="chip demo">Demo</span> No SMS gateway is connected in this build.</p>
+        </div>
+        <div class="card spine-admin">
+          <h4>Telehealth rooms</h4>
+          <p>Whether video consultations and diagnostic chat sessions are offered at all. Switching
+          this off removes telehealth across the product regardless of individual consultant
+          settings.</p>
+        </div>
+      </div>
+      <p><strong>Save Global Configuration</strong> applies both, immediately, for every signed-in user.</p>
+
+      <h3>Purge &amp; seed system databases</h3>
+      <div class="note crit">
+        <span class="tag">Destructive — no undo</span>
+        <p>
+          <strong>Purge &amp; Seed System Databases</strong> wipes the live data and rewrites it with
+          the demonstration set: seven consultants, four patients with full histories, and the sample
+          appointments and documents. Every real booking, prescription, uploaded document and invoice
+          is discarded.
+        </p>
+        <p>Use it to reset a demonstration environment. Never use it on a system holding real patient
+        records.</p>
+      </div>
+    </section>
+
+    <!-- ==================== PART 8 ==================== -->
+    <section id="part-8">
+      <span class="part-no">Part Eight</span>
+      <h2>Document Vault &amp; AI analysis</h2>
+      <div class="chips">
+        <span class="chip patient">Patient</span>
+        <span class="chip doctor">Consultant</span>
+        <span class="chip desk">Front Desk</span>
+        <span class="chip admin">Admin</span>
+      </div>
+      <p class="section-lede">
+        The only destination available to all four roles. Two tabs: <strong>Browse</strong> and
+        <strong>Add document</strong>.
+      </p>
+
+      <p class="path"><b>Left rail</b> → Records → <b>Document Vault</b></p>
+
+      <h3>Browsing</h3>
+      <p>
+        Search runs across the whole document text — a medicine, a test value, a diagnosis, a doctor or
+        a patient name will all find it. Category chips carry a live count each:
+        <strong>All</strong>, <strong>Prescriptions</strong>, <strong>Lab tests</strong>,
+        <strong>Referrals</strong>, <strong>Vaccinations</strong>, <strong>Other</strong>. A
+        <strong>Patient</strong> dropdown narrows to one person, or <em>Everyone</em>. Every document
+        can be downloaded or sent to a printer as a PDF. Documents that have been analysed carry an AI
+        marker.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar">Document Vault<span class="role">All roles</span></div>
+        <img src="__SHOT:19-vault__" alt="The Document Vault. A search box invites searching a medicine, test value, diagnosis, doctor or patient. Category chips read All 5, Prescriptions 3, Lab tests 2, Referrals 0, Vaccinations 0, Other 0, with a Patient dropdown set to Everyone. Three columns: a list of stored documents; the selected 12-Lead Electrocardiogram report with Download and print buttons and its raw text; and an analysis panel headed What this says, tagged Low risk, summarising the EKG and listing key findings including normal sinus rhythm at 72 bpm and borderline blood pressure of 138 over 85." />
+        <figcaption>Left, the filed documents; middle, the document itself; right, the AI reading — headed <b>What this says</b> with a risk chip. The prescription filed automatically on <span class="m">2026-08-04</span> is the one a consultation produced.</figcaption>
+      </figure>
+
+      <h3>Adding a document</h3>
+      <ol class="steps">
+        <li><h4>Choose the patient</h4><p>The record it will be filed against.</p></li>
+        <li><h4>Title and category</h4><p><em>e.g. “Cardiology prescription — August 2026”.</em></p></li>
+        <li><h4>Paste the content</h4><p>The prescription, lab report or vaccination record as text.
+        This text is what search reads and what the analyser is given.</p></li>
+      </ol>
+
+      <h3>What the analyser returns</h3>
+      <p>
+        <strong>Analyse</strong> sends the document text to Google Gemini and files six structured
+        results against it:
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Contents</th></tr></thead>
+          <tbody>
+            <tr><td>Summary</td><td>Under 100 words, in plain professional language.</td></tr>
+            <tr><td>Key findings</td><td>Observations, lab values and health statuses found in the text.</td></tr>
+            <tr><td>Extracted allergies</td><td>Allergies explicitly noted; empty if none.</td></tr>
+            <tr><td>Extracted medications</td><td>Medicines prescribed or currently taken.</td></tr>
+            <tr><td>Suggested follow-up</td><td>A recommended next test, action or lifestyle change.</td></tr>
+            <tr><td>Risk level</td><td><span class="pill done">Low</span> <span class="pill sched">Medium</span> <span class="pill live">High</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note warn">
+        <span class="tag">Read this before relying on it</span>
+        <p>The analysis is a reading aid, not a clinical opinion. Nothing it extracts is written into
+        the patient's allergy or medication lists automatically — a consultant still has to enter those
+        in Clinical Patients. Analysis requires a configured Gemini API key; without one, the button
+        returns an error and the document is stored unanalysed.</p>
+      </div>
+    </section>
+
+    <!-- ==================== PART 9 ==================== -->
+    <section id="part-9">
+      <span class="part-no">Part Nine</span>
+      <h2>The telehealth room</h2>
+      <div class="chips">
+        <span class="chip patient">Patient</span>
+        <span class="chip doctor">Consultant</span>
+      </div>
+      <p class="section-lede">
+        The cabin opens automatically when either side joins a video appointment — it is not a
+        destination you can navigate to cold. While a session is running, an
+        <strong>In Session</strong> group appears in the left rail with a pulsing
+        <strong>Live</strong> badge.
+      </p>
+
+      <figure class="shot" style="--accent: var(--doctor);">
+        <div class="shot-bar">Telehealth Room<span class="role">Patient · Consultant</span></div>
+        <img src="__SHOT:21-telehealth__" alt="The telehealth room. The left rail now carries an In Session group with a Telehealth Room entry badged LIVE. The main video shows the consultant with a call timer reading 00:10, a LIVE tag, the patient's self-view picture-in-picture, and three round controls for microphone, camera and hang up. A Live Diagnostics Log below lists connection events. On the right, a Side Chat tab beside Clinical Notes shows a Send as Patient or Doctor switch, a shared lab report link with Open Link and Copy buttons, and Quick Link Attachments for Lab Report, Follow-up Link and Care Guide." />
+        <figcaption>The <b>Send as</b> switch lets one person demonstrate both sides of the conversation. <b>Prescription (PDF)</b> and <b>Exit Room</b> sit top right throughout.</figcaption>
+      </figure>
+
+      <div class="grid-2">
+        <div class="card spine-doctor">
+          <h4>The call</h4>
+          <p>Main video with the patient's self-view picture-in-picture, a running call timer, a
+          <strong>LIVE</strong> indicator, and three controls: mute, camera off, and hang up.
+          A live diagnostics log runs underneath.</p>
+          <p><span class="chip demo">Demo</span> The feeds are simulated — no WebRTC connection is
+          established.</p>
+        </div>
+        <div class="card spine-doctor">
+          <h4>Chat</h4>
+          <p>A side panel for messages during the call, with a role switch so a single demonstrator can
+          type as either the doctor or the patient, and an <strong>attach link</strong> control for
+          sharing a titled URL — an ECG scan, a lab portal.</p>
+        </div>
+        <div class="card spine-doctor">
+          <h4>Notes &amp; prescription</h4>
+          <p>The consultant types findings and adds medicines one at a time while the call runs. These
+          feed the same completion path as an in-person consultation.</p>
+        </div>
+        <div class="card spine-doctor">
+          <h4>Finishing</h4>
+          <p>Ending the consultation shows a <strong>Consultation Finalized</strong> summary with the
+          notes and prescribed medicines, a <strong>Download Prescription (PDF)</strong> button — a
+          formatted, digitally-signed prescription sheet on hospital letterhead — and a way back to the
+          portal.</p>
+        </div>
+      </div>
+
+      <p>
+        Leaving the room without finishing (<strong>Exit Room</strong>) returns you to the portal with
+        the appointment still <span class="pill live">active-video</span>; you can rejoin. If you open
+        the telehealth destination with no session running, you get a short explanation and a way back
+        rather than an error.
+      </p>
+    </section>
+
+    <!-- ==================== PART 10 ==================== -->
+    <section id="part-10">
+      <span class="part-no">Part Ten</span>
+      <h2>Reference</h2>
+
+      <h3>Who can reach what</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Destination</th>
+              <th>Patient</th>
+              <th>Consultant</th>
+              <th>Front Desk</th>
+              <th>Admin</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Persona Portal</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Consultations queue</td><td class="no">—</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Care Dashboard</td><td class="no">—</td><td class="no">—</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Book Appointment</td><td class="yes">Yes</td><td class="no">—</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Clinical Patients</td><td class="no">—</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Document Vault</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Telehealth Room</td><td class="yes">In session</td><td class="yes">In session</td><td class="no">—</td><td class="no">—</td></tr>
+            <tr><td>Hospital config &amp; purge</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>The consultant roster as shipped</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Consultant</th><th>Department</th><th>City</th>
+              <th class="num">Fee</th><th class="num">Slots</th><th class="num">Per slot</th><th>Video</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Dr. Rajesh Sharma</td><td>Cardiology</td><td>New Delhi</td><td class="num">₹1,200</td><td class="num">6</td><td class="num">3</td><td class="yes">Yes</td></tr>
+            <tr><td>Dr. Ananya Mukherjee</td><td>Pediatrics</td><td>Bengaluru</td><td class="num">₹900</td><td class="num">6</td><td class="num">2</td><td class="yes">Yes</td></tr>
+            <tr><td>Dr. Vikramaditya Verma</td><td>Dermatology</td><td>Mumbai</td><td class="num">₹1,000</td><td class="num">6</td><td class="num">4</td><td class="no">—</td></tr>
+            <tr><td>Dr. Priya Sundaram</td><td>General Medicine</td><td>Chennai</td><td class="num">₹750</td><td class="num">7</td><td class="num">3</td><td class="yes">Yes</td></tr>
+            <tr><td>Dr. Arvind Rao</td><td>Orthopedics</td><td>Hyderabad</td><td class="num">₹1,100</td><td class="num">4</td><td class="num">3</td><td class="no">—</td></tr>
+            <tr><td>Dr. Sunita Banerjee</td><td>Gynecology</td><td>Kolkata</td><td class="num">₹950</td><td class="num">5</td><td class="num">2</td><td class="yes">Yes</td></tr>
+            <tr><td>Dr. Rohan Kapoor</td><td>Neurology</td><td>Dwarka</td><td class="num">₹1,300</td><td class="num">4</td><td class="num">2</td><td class="yes">Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Money, at a glance</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Charge</th><th>Amount</th><th>Paid</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Booking fee</td><td class="num">₹50</td><td>Online, at booking</td><td>Holds the slot. Same for every consultant.</td></tr>
+            <tr><td>Consultant's fee</td><td class="num">₹750 – ₹1,300</td><td>At hospital reception</td><td>Set per consultant by the desk or admin.</td></tr>
+            <tr><td>Follow-up discount</td><td class="num">−20%</td><td>—</td><td>Applies to the consultant's fee only, never the ₹50.</td></tr>
+            <tr><td>Clinic tax</td><td class="num">18% GST</td><td>On the invoice</td><td>Rate configurable by the administrator.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Formats you will see</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Identifier</th><th>Format</th><th>Where it appears</th></tr></thead>
+          <tbody>
+            <tr><td>Booking number</td><td class="num">BK-NXG-######</td><td>Confirmation, receipts, reschedules</td></tr>
+            <tr><td>OPD token</td><td class="num">Token #BK-&lt;last 4&gt;</td><td>Front desk check-in QR only — <strong>not</strong> the confirmation screen</td></tr>
+            <tr><td>Tax invoice</td><td class="num">INV-BK-NXG-######</td><td>Printable invoice</td></tr>
+            <tr><td>Receipt</td><td class="num">REC-APPT-…</td><td>Front desk receipt modal</td></tr>
+            <tr><td>Filed prescription</td><td class="num">prescription_YYYY-MM-DD.txt</td><td>Document Vault</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== PART 11 ==================== -->
+    <section id="part-11">
+      <span class="part-no">Part Eleven</span>
+      <h2>What is live, and what is staged</h2>
+      <p class="section-lede">
+        This build is a working demonstration. Some mechanisms run for real against the server; others
+        are staged so the flow can be shown without external services. Presenting the second group as
+        the first is the fastest way to lose a room — so here is the honest split.
+      </p>
+
+      <div class="grid-2">
+        <div class="card" style="border-left: 3px solid var(--ok);">
+          <h4>Genuinely working</h4>
+          <ul>
+            <li>Slot capacity counting and enforcement at the server.</li>
+            <li>The waitlist: entries, cancellation triggers, alerts, and the ten-second poll.</li>
+            <li>Appointment state changes across every screen.</li>
+            <li>Patient profiles, clinical lists and vitals.</li>
+            <li>The Document Vault, and prescription filing on consultation close.</li>
+            <li>AI document analysis — a real Gemini call, with an API key configured.</li>
+            <li>Consultant roster, fees, slots and availability.</li>
+            <li>Printable invoices, receipts and prescription PDFs.</li>
+          </ul>
+        </div>
+        <div class="card" style="border-left: 3px solid var(--warn);">
+          <h4>Staged for demonstration</h4>
+          <ul>
+            <li><strong>Sign-in</strong> — four hard-coded accounts; no real authentication.</li>
+            <li><strong>Payments</strong> — no gateway. Bookings are recorded as paid on confirmation.</li>
+            <li><strong>Video calls</strong> — simulated feeds; no WebRTC connection.</li>
+            <li><strong>WhatsApp, SMS, email and push</strong> — settings are captured, messages are not
+            sent. Test buttons show on-screen toasts.</li>
+            <li><strong>Delay and unavailability alerts</strong> — driven by the two simulate buttons.</li>
+            <li><strong>Booking-step file uploads</strong> — file names only; use the vault for real
+            documents.</li>
+            <li><strong>Storage</strong> — a single JSON file, not a database.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note crit">
+        <span class="tag">The one thing to fix first</span>
+        <p>The API accepts every request without authentication. Anyone who can reach the server can
+        read and modify all patient data. Put authentication in front of it before this build touches a
+        public address or a real patient record.</p>
+      </div>
+
+      <h3>Defects found while capturing these screenshots</h3>
+      <p>
+        Every screen in this manual was photographed from a running build rather than described from
+        the code. Two things did not behave as the code suggested they would.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>What happens</th><th>Why</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>No OPD token on the confirmation screen</td>
+              <td>The wizard generates a token and sends it, but the server never stores it, so nothing
+              comes back to display.</td>
+              <td>Patients have a booking ID but no queue token. The desk's QR pass invents one from
+              the appointment ID instead.</td>
+            </tr>
+            <tr>
+              <td>A booking is recorded as paid before any money moves</td>
+              <td>The server stamps every new appointment as paid at creation.</td>
+              <td><em>Pay at the counter</em> bookings look settled in the system while the ₹50 is
+              still owed.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <span>neXgen Healthcare — operating manual for patients, consultants, front desk and administrators.</span>
+      <span>Prepared 5 August 2026 · screenshots captured from the running build</span>
+    </footer>
+
+  </main>
+</div>

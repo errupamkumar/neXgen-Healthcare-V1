@@ -1,0 +1,6 @@
+{
+  "name": "neXgen-HealthCare",
+  "description": "Next-generation healthcare platform for doctor appointment booking, online token registration, offline doctor consultation payments, ABHA records, and AI medical document analysis.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

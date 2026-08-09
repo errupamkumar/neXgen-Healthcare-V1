@@ -1,0 +1,395 @@
+@import "tailwindcss";
+
+/* =========================================================================
+   neXgen Healthcare — "Clinical Calm" design system
+   -------------------------------------------------------------------------
+   A sober, institutional palette built for a hospital setting: low-chroma
+   surgical teal as the primary, cool paper neutrals, and muted clinical
+   signal colours. Nothing here shouts; hierarchy comes from weight and
+   spacing rather than saturation.
+   ========================================================================= */
+
+/* The app ships a single light clinical theme. Tailwind v4 otherwise binds
+   `dark:` to prefers-color-scheme, which would half-apply the incomplete dark
+   styling still present in some components to anyone on a dark OS. Binding the
+   variant to an explicit `.dark` class keeps those rules dormant — and means a
+   future dark theme only needs the missing variants written, not rewiring. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* -------------------------------------------------------------------------
+   Runtime surface tokens (flip between light + dark)
+   ------------------------------------------------------------------------- */
+:root {
+  --app-canvas: oklch(0.979 0.003 195);
+  --app-surface: oklch(1 0 0);
+  --app-hairline: oklch(0.913 0.006 220);
+  --app-ink: oklch(0.264 0.017 220);
+  --app-ink-soft: oklch(0.514 0.017 220);
+}
+
+.dark {
+  --app-canvas: oklch(0.184 0.012 210);
+  --app-surface: oklch(0.229 0.014 212);
+  --app-hairline: oklch(0.303 0.016 213);
+  --app-ink: oklch(0.947 0.005 210);
+  --app-ink-soft: oklch(0.702 0.014 212);
+}
+
+@theme inline {
+  --color-canvas: var(--app-canvas);
+  --color-surface: var(--app-surface);
+  --color-hairline: var(--app-hairline);
+  --color-ink: var(--app-ink);
+  --color-ink-soft: var(--app-ink-soft);
+}
+
+@theme {
+  /* --- Typography -------------------------------------------------------
+     IBM Plex: an institutional superfamily. Serif carries the wordmark and
+     page titles, Sans runs the interface, Mono handles clinical data
+     (booking numbers, ABHA IDs, slot times, currency) where digit alignment
+     genuinely aids scanning. */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "IBM Plex Serif", ui-serif, Georgia, Cambria, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* --- Primary: surgical teal -------------------------------------------
+     Aliased onto `indigo` because the existing screens reference indigo-*
+     throughout; re-pointing the ramp re-skins every screen consistently.
+     Lightness steps are preserved so text/background contrast pairings that
+     already worked keep working. */
+  --color-indigo-50: oklch(0.978 0.008 190);
+  --color-indigo-100: oklch(0.950 0.018 190);
+  --color-indigo-200: oklch(0.902 0.032 190);
+  --color-indigo-300: oklch(0.828 0.046 190);
+  --color-indigo-400: oklch(0.712 0.058 190);
+  --color-indigo-500: oklch(0.585 0.062 190);
+  --color-indigo-600: oklch(0.505 0.056 190);
+  --color-indigo-700: oklch(0.432 0.048 191);
+  --color-indigo-800: oklch(0.372 0.040 192);
+  --color-indigo-900: oklch(0.318 0.033 193);
+  --color-indigo-950: oklch(0.212 0.024 194);
+
+  /* Purples are never appropriate here — fold them onto the primary ramp so
+     no stray `violet-*` / `purple-*` utility breaks the palette. */
+  --color-violet-50: var(--color-indigo-50);
+  --color-violet-100: var(--color-indigo-100);
+  --color-violet-200: var(--color-indigo-200);
+  --color-violet-300: var(--color-indigo-300);
+  --color-violet-400: var(--color-indigo-400);
+  --color-violet-500: var(--color-indigo-500);
+  --color-violet-600: var(--color-indigo-600);
+  --color-violet-700: var(--color-indigo-700);
+  --color-violet-800: var(--color-indigo-800);
+  --color-violet-900: var(--color-indigo-900);
+  --color-violet-950: var(--color-indigo-950);
+  --color-purple-50: var(--color-indigo-50);
+  --color-purple-100: var(--color-indigo-100);
+  --color-purple-200: var(--color-indigo-200);
+  --color-purple-300: var(--color-indigo-300);
+  --color-purple-400: var(--color-indigo-400);
+  --color-purple-500: var(--color-indigo-500);
+  --color-purple-600: var(--color-indigo-600);
+  --color-purple-700: var(--color-indigo-700);
+  --color-purple-800: var(--color-indigo-800);
+  --color-purple-900: var(--color-indigo-900);
+  --color-purple-950: var(--color-indigo-950);
+  --color-fuchsia-500: var(--color-indigo-500);
+  --color-fuchsia-600: var(--color-indigo-600);
+  --color-pink-500: var(--color-indigo-500);
+  --color-pink-600: var(--color-indigo-600);
+
+  /* --- Secondary: steel blue (sky / blue / cyan) ------------------------- */
+  --color-sky-50: oklch(0.976 0.008 235);
+  --color-sky-100: oklch(0.946 0.017 235);
+  --color-sky-200: oklch(0.897 0.031 235);
+  --color-sky-300: oklch(0.822 0.045 236);
+  --color-sky-400: oklch(0.706 0.058 238);
+  --color-sky-500: oklch(0.596 0.066 240);
+  --color-sky-600: oklch(0.510 0.062 242);
+  --color-sky-700: oklch(0.440 0.053 243);
+  --color-sky-800: oklch(0.378 0.044 244);
+  --color-sky-900: oklch(0.322 0.036 245);
+  --color-sky-950: oklch(0.215 0.027 246);
+  --color-blue-50: var(--color-sky-50);
+  --color-blue-100: var(--color-sky-100);
+  --color-blue-200: var(--color-sky-200);
+  --color-blue-300: var(--color-sky-300);
+  --color-blue-400: var(--color-sky-400);
+  --color-blue-500: var(--color-sky-500);
+  --color-blue-600: var(--color-sky-600);
+  --color-blue-700: var(--color-sky-700);
+  --color-blue-800: var(--color-sky-800);
+  --color-blue-900: var(--color-sky-900);
+  --color-blue-950: var(--color-sky-950);
+  --color-cyan-50: var(--color-sky-50);
+  --color-cyan-100: var(--color-sky-100);
+  --color-cyan-200: var(--color-sky-200);
+  --color-cyan-300: var(--color-sky-300);
+  --color-cyan-400: var(--color-sky-400);
+  --color-cyan-500: var(--color-sky-500);
+  --color-cyan-600: var(--color-sky-600);
+  --color-cyan-700: var(--color-sky-700);
+  --color-cyan-800: var(--color-sky-800);
+  --color-cyan-900: var(--color-sky-900);
+  --color-cyan-950: var(--color-sky-950);
+
+  /* --- Signal: moss (healthy / live / paid) ------------------------------ */
+  --color-emerald-50: oklch(0.975 0.012 150);
+  --color-emerald-100: oklch(0.944 0.024 150);
+  --color-emerald-200: oklch(0.893 0.042 149);
+  --color-emerald-300: oklch(0.817 0.058 148);
+  --color-emerald-400: oklch(0.702 0.070 148);
+  --color-emerald-500: oklch(0.602 0.072 148);
+  --color-emerald-600: oklch(0.515 0.065 148);
+  --color-emerald-700: oklch(0.444 0.055 148);
+  --color-emerald-800: oklch(0.382 0.045 149);
+  --color-emerald-900: oklch(0.326 0.037 150);
+  --color-emerald-950: oklch(0.216 0.028 151);
+  --color-green-50: var(--color-emerald-50);
+  --color-green-100: var(--color-emerald-100);
+  --color-green-200: var(--color-emerald-200);
+  --color-green-300: var(--color-emerald-300);
+  --color-green-400: var(--color-emerald-400);
+  --color-green-500: var(--color-emerald-500);
+  --color-green-600: var(--color-emerald-600);
+  --color-green-700: var(--color-emerald-700);
+  --color-green-800: var(--color-emerald-800);
+  --color-green-900: var(--color-emerald-900);
+  --color-green-950: var(--color-emerald-950);
+  --color-teal-500: var(--color-emerald-500);
+  --color-teal-600: var(--color-emerald-600);
+  --color-teal-700: var(--color-emerald-700);
+
+  /* --- Signal: clay (caution / pending) ---------------------------------- */
+  --color-amber-50: oklch(0.980 0.014 85);
+  --color-amber-100: oklch(0.956 0.030 85);
+  --color-amber-200: oklch(0.910 0.055 83);
+  --color-amber-300: oklch(0.848 0.078 80);
+  --color-amber-400: oklch(0.775 0.093 76);
+  --color-amber-500: oklch(0.705 0.099 72);
+  --color-amber-600: oklch(0.610 0.093 65);
+  --color-amber-700: oklch(0.505 0.078 60);
+  --color-amber-800: oklch(0.428 0.064 58);
+  --color-amber-900: oklch(0.368 0.052 58);
+  --color-amber-950: oklch(0.242 0.039 58);
+  --color-yellow-50: var(--color-amber-50);
+  --color-yellow-100: var(--color-amber-100);
+  --color-yellow-200: var(--color-amber-200);
+  --color-yellow-300: var(--color-amber-300);
+  --color-yellow-400: var(--color-amber-400);
+  --color-yellow-500: var(--color-amber-500);
+  --color-yellow-600: var(--color-amber-600);
+  --color-yellow-700: var(--color-amber-700);
+  --color-yellow-800: var(--color-amber-800);
+  --color-yellow-900: var(--color-amber-900);
+  --color-orange-50: var(--color-amber-50);
+  --color-orange-100: var(--color-amber-100);
+  --color-orange-200: var(--color-amber-200);
+  --color-orange-300: var(--color-amber-300);
+  --color-orange-400: var(--color-amber-400);
+  --color-orange-500: var(--color-amber-500);
+  --color-orange-600: var(--color-amber-600);
+  --color-orange-700: var(--color-amber-700);
+  --color-orange-800: var(--color-amber-800);
+  --color-orange-900: var(--color-amber-900);
+
+  /* --- Signal: brick (cancelled / critical) ------------------------------ */
+  --color-rose-50: oklch(0.972 0.011 25);
+  --color-rose-100: oklch(0.940 0.023 25);
+  --color-rose-200: oklch(0.884 0.041 25);
+  --color-rose-300: oklch(0.806 0.060 25);
+  --color-rose-400: oklch(0.700 0.082 26);
+  --color-rose-500: oklch(0.604 0.101 27);
+  --color-rose-600: oklch(0.522 0.110 28);
+  --color-rose-700: oklch(0.448 0.094 28);
+  --color-rose-800: oklch(0.388 0.077 28);
+  --color-rose-900: oklch(0.334 0.063 28);
+  --color-rose-950: oklch(0.222 0.047 28);
+  --color-red-50: var(--color-rose-50);
+  --color-red-100: var(--color-rose-100);
+  --color-red-200: var(--color-rose-200);
+  --color-red-300: var(--color-rose-300);
+  --color-red-400: var(--color-rose-400);
+  --color-red-500: var(--color-rose-500);
+  --color-red-600: var(--color-rose-600);
+  --color-red-700: var(--color-rose-700);
+  --color-red-800: var(--color-rose-800);
+  --color-red-900: var(--color-rose-900);
+  --color-red-950: var(--color-rose-950);
+
+  /* --- Neutrals: cool clinical paper ------------------------------------- */
+  --color-slate-50: oklch(0.981 0.003 220);
+  --color-slate-100: oklch(0.960 0.004 220);
+  --color-slate-200: oklch(0.913 0.006 220);
+  --color-slate-300: oklch(0.858 0.009 220);
+  --color-slate-400: oklch(0.685 0.014 220);
+  --color-slate-500: oklch(0.556 0.016 220);
+  --color-slate-600: oklch(0.446 0.017 220);
+  --color-slate-700: oklch(0.362 0.017 218);
+  --color-slate-800: oklch(0.272 0.016 214);
+  --color-slate-900: oklch(0.216 0.014 212);
+  --color-slate-950: oklch(0.158 0.012 210);
+}
+
+/* -------------------------------------------------------------------------
+   Base layer
+   ------------------------------------------------------------------------- */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--app-canvas);
+    color: var(--app-ink);
+    font-family: var(--font-sans);
+    /* Plex ships proper lining/tabular figures — clinical data lines up. */
+    font-feature-settings: "kern", "liga", "calt";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Numeric data (fees, slot times, booking refs) should never reflow width. */
+  .tabular,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background-color: var(--color-indigo-200);
+    color: var(--color-indigo-950);
+  }
+
+  /* Native controls default to the browser's vivid blue, which is the one
+     colour Tailwind utilities can't reach. */
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='range'],
+  progress {
+    accent-color: var(--color-indigo-600);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-indigo-600);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* The booking flow pins its Back/Continue bar to the bottom of the viewport.
+     Without this, scrolling a control into view (tab key, or scrollIntoView)
+     parks it underneath that bar where it can't be clicked. */
+  button,
+  input,
+  select,
+  textarea,
+  a[href],
+  summary {
+    scroll-margin-bottom: 6rem;
+    scroll-margin-top: 5rem;
+  }
+
+  /* Restrained scrollbars — the sidebar and long record lists get a lot of
+     scroll surface, so the default chrome-heavy bars read as noise. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--app-hairline) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--app-hairline);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-slate-400);
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Utilities
+   ------------------------------------------------------------------------- */
+@utility rail-scroll {
+  scrollbar-color: color-mix(in oklab, white 14%, transparent) transparent;
+}
+
+/* Hairline grid used behind the sidebar brand block — texture without noise. */
+@utility clinical-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, white 4%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, white 4%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* A single restrained page-change reveal — the whole content column lifts a
+   few pixels rather than each card animating on its own. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility page-enter {
+  /* `backwards`, NOT `both`.
+     With a forwards-filling fill-mode the animation stays "in effect" after it
+     ends, so `transform` keeps resolving to a matrix — an identity one, but a
+     matrix all the same. A resolved transform makes the element a containing
+     block for `position: fixed` descendants AND its own stacking context, which
+     silently broke every modal in the app: overlays sized themselves to <main>
+     instead of the viewport, and the z-30 sticky header painted over their
+     z-50. The `to` keyframe already equals the element's natural state, so
+     nothing is lost by not filling forwards; `backwards` still applies the
+     `from` state before the animation starts, which is what avoids a flash.
+     Was: animation: page-enter 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) both; */
+  animation: page-enter 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+/* window.print() would otherwise print the whole page — sidebar, nav and all.
+   Anything marked .print-target becomes the entire printed document, which is
+   how both the booking invoice and a prescription print cleanly. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .print-target,
+  .print-target * {
+    visibility: visible;
+  }
+
+  .print-target {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
