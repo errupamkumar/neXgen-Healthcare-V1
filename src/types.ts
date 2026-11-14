@@ -146,6 +146,58 @@ export interface Appointment {
   invoiceAmount?: number;
   /** Present once the doctor has closed this consultation. */
   consultation?: ConsultationRecord;
+
+  /** OPD token for the doctor's day, issued by the server in booking order: "T-07". */
+  tokenNo?: string;
+  /** The flat platform fee charged for this booking (always PLATFORM_FEE). */
+  platformFee?: number;
+  bookedAt?: string;
+  bookedBy?: 'patient' | 'hospital' | 'admin';
+  feedbackAt?: string;
+  cancelledAt?: string;
+  cancelledBy?: 'patient' | 'doctor' | 'hospital' | 'admin';
+  cancelReason?: string;
+  /** Set when a cancellation earns the platform fee back. */
+  refundStatus?: 'initiated' | 'completed';
+  refundAmount?: number;
+  /** Previous slots, oldest first, each time the booking was moved. */
+  rescheduleHistory?: Array<{
+    doctorId: string;
+    date: string;
+    timeSlot: string;
+    type: 'visiting' | 'video';
+    tokenNo?: string;
+    at: string;
+  }>;
+}
+
+/** A doctor's "Join neXgen" application, reviewed by an administrator. */
+export interface DoctorApplication {
+  id: string;
+  name: string;
+  specialty: string;
+  department?: string;
+  qualification?: string;
+  registrationNo: string;
+  phone: string;
+  email?: string;
+  hospital: string;
+  addressLine?: string;
+  area?: string;
+  landmark?: string;
+  district?: string;
+  state?: string;
+  pincode?: string;
+  bio?: string;
+  experienceYears?: number;
+  videoEnabled: boolean;
+  slots: string[];
+  maxSchedulesPerSlot: number;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+  doctorId?: string;
 }
 
 export interface WaitlistEntry {

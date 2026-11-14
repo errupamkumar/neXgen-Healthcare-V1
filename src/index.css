@@ -1,38 +1,121 @@
 @import "tailwindcss";
 
 /* =========================================================================
-   neXgen Healthcare — "Clinical Calm" design system
+   neXgen Healthcare — "Care Bright" design system
    -------------------------------------------------------------------------
-   A sober, institutional palette built for a hospital setting: low-chroma
-   surgical teal as the primary, cool paper neutrals, and muted clinical
-   signal colours. Nothing here shouts; hierarchy comes from weight and
-   spacing rather than saturation.
+   A warm, trustworthy clinic palette for a patient-facing booking platform:
+   a confident care-blue primary, a fresh teal secondary and a coral accent
+   reserved for the one action that matters on a screen (Book / Pay ₹50).
+   Neutrals carry a faint blue so white cards sit on a calm, airy canvas.
    ========================================================================= */
 
-/* The app ships a single light clinical theme. Tailwind v4 otherwise binds
-   `dark:` to prefers-color-scheme, which would half-apply the incomplete dark
-   styling still present in some components to anyone on a dark OS. Binding the
-   variant to an explicit `.dark` class keeps those rules dormant — and means a
-   future dark theme only needs the missing variants written, not rewiring. */
+/* The app ships a single light theme. Tailwind v4 otherwise binds `dark:` to
+   prefers-color-scheme, which would half-apply the incomplete dark styling
+   still present in some components to anyone on a dark OS. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* -------------------------------------------------------------------------
-   Runtime surface tokens (flip between light + dark)
+   Runtime surface tokens
    ------------------------------------------------------------------------- */
 :root {
-  --app-canvas: oklch(0.979 0.003 195);
-  --app-surface: oklch(1 0 0);
-  --app-hairline: oklch(0.913 0.006 220);
-  --app-ink: oklch(0.264 0.017 220);
-  --app-ink-soft: oklch(0.514 0.017 220);
+  --app-canvas: #f4f7fc;
+  --app-surface: #ffffff;
+  --app-hairline: #e2e8f2;
+  --app-ink: #0f1b33;
+  --app-ink-soft: #5a6a85;
 }
 
+/* -------------------------------------------------------------------------
+   Dark theme.
+
+   Rather than hand-writing `dark:` variants across ~15k lines of screens, the
+   theme re-points the colour ramps themselves while `.dark` is on <html>:
+   - neutrals flip (slate-50 becomes a deep surface, slate-900 becomes near
+     white) — but slate-950 stays dark, because it is used for the bands that
+     are dark on purpose (site footer, app rail, "For doctors" panel);
+   - every tint (…-50/100/200, used for soft badges and panels) becomes a
+     deep tinted surface, and the text shades (…-700 to -950) lighten so they
+     stay readable on it. Mid tones (300–600: buttons, icons) are unchanged.
+   Utilities that bypass the ramps (`bg-white`, `via-white`, `text-slate-950`)
+   are mapped explicitly below.
+   ------------------------------------------------------------------------- */
 .dark {
-  --app-canvas: oklch(0.184 0.012 210);
-  --app-surface: oklch(0.229 0.014 212);
-  --app-hairline: oklch(0.303 0.016 213);
-  --app-ink: oklch(0.947 0.005 210);
-  --app-ink-soft: oklch(0.702 0.014 212);
+  color-scheme: dark;
+  --app-canvas: #0a1120;
+  --app-surface: #111b2e;
+  --app-hairline: #233149;
+  --app-ink: #edf2fa;
+  --app-ink-soft: #9aabc7;
+
+  --color-slate-50: #131e33;
+  --color-slate-100: #19253d;
+  --color-slate-200: #24324d;
+  --color-slate-300: #34456a;
+  --color-slate-400: #7385a6;
+  --color-slate-500: #94a4c0;
+  --color-slate-600: #afbcd3;
+  --color-slate-700: #c7d1e3;
+  --color-slate-800: #dbe3f0;
+  --color-slate-900: #edf2fa;
+  --color-slate-950: #050a15;
+
+  --color-indigo-50: #131d42;
+  --color-indigo-100: #182658;
+  --color-indigo-200: #213475;
+  --color-indigo-700: #93b4ff;
+  --color-indigo-800: #b6cbff;
+  --color-indigo-900: #d5e2ff;
+  --color-indigo-950: #ebf1ff;
+
+  --color-sky-50: #0d2333;
+  --color-sky-100: #102c40;
+  --color-sky-200: #143a55;
+  --color-sky-700: #7dd0f2;
+  --color-sky-800: #a9e1f7;
+  --color-sky-900: #cdeefb;
+  --color-sky-950: #e8f8fe;
+
+  --color-teal-50: #0b2522;
+  --color-teal-100: #0e302c;
+  --color-teal-200: #12423c;
+  --color-teal-700: #5fe0c8;
+  --color-teal-800: #95ecdb;
+  --color-teal-900: #c3f5eb;
+  --color-teal-950: #e4fbf6;
+
+  --color-emerald-50: #0a2418;
+  --color-emerald-100: #0d2f20;
+  --color-emerald-200: #11402c;
+  --color-emerald-700: #5ee0a8;
+  --color-emerald-800: #93ecc4;
+  --color-emerald-900: #c1f5dc;
+  --color-emerald-950: #e3fbef;
+
+  --color-amber-50: #2a1f08;
+  --color-amber-100: #36280a;
+  --color-amber-200: #4a370d;
+  --color-amber-700: #fbbf4a;
+  --color-amber-800: #fcd27a;
+  --color-amber-900: #fde4a8;
+  /* amber-950 stays dark: it is the text colour on amber-400 rating pills. */
+
+  --color-rose-50: #2c0e17;
+  --color-rose-100: #3a121e;
+  --color-rose-200: #511829;
+  --color-rose-700: #ff8fa3;
+  --color-rose-800: #ffb3c1;
+  --color-rose-900: #ffd5dd;
+  --color-rose-950: #ffecf0;
+
+  --color-coral-50: #2c140d;
+  --color-coral-100: #3a1910;
+  --color-coral-200: #522216;
+  --color-coral-700: #ff9a80;
+  --color-coral-800: #ffbba8;
+  --color-coral-900: #ffd9cf;
+
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 28px -14px rgb(0 0 0 / 0.6);
+  --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.4), 0 22px 44px -18px rgb(0 0 0 / 0.7);
 }
 
 @theme inline {
@@ -45,33 +128,32 @@
 
 @theme {
   /* --- Typography -------------------------------------------------------
-     IBM Plex: an institutional superfamily. Serif carries the wordmark and
-     page titles, Sans runs the interface, Mono handles clinical data
-     (booking numbers, ABHA IDs, slot times, currency) where digit alignment
-     genuinely aids scanning. */
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-serif: "IBM Plex Serif", ui-serif, Georgia, Cambria, serif;
+     Plus Jakarta Sans: friendly, modern and highly legible on phones. It
+     runs both the interface and the headings (the `font-serif` token is kept
+     as the "display" face so existing screens re-skin without edits). IBM
+     Plex Mono stays for clinical data — booking numbers, tokens, slot times
+     and currency — where aligned digits genuinely aid scanning. */
+  --font-sans: "Plus Jakarta Sans", "Noto Sans Devanagari", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Plus Jakarta Sans", "Noto Sans Devanagari", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* --- Primary: surgical teal -------------------------------------------
+  /* --- Primary: care blue -----------------------------------------------
      Aliased onto `indigo` because the existing screens reference indigo-*
-     throughout; re-pointing the ramp re-skins every screen consistently.
-     Lightness steps are preserved so text/background contrast pairings that
-     already worked keep working. */
-  --color-indigo-50: oklch(0.978 0.008 190);
-  --color-indigo-100: oklch(0.950 0.018 190);
-  --color-indigo-200: oklch(0.902 0.032 190);
-  --color-indigo-300: oklch(0.828 0.046 190);
-  --color-indigo-400: oklch(0.712 0.058 190);
-  --color-indigo-500: oklch(0.585 0.062 190);
-  --color-indigo-600: oklch(0.505 0.056 190);
-  --color-indigo-700: oklch(0.432 0.048 191);
-  --color-indigo-800: oklch(0.372 0.040 192);
-  --color-indigo-900: oklch(0.318 0.033 193);
-  --color-indigo-950: oklch(0.212 0.024 194);
+     throughout; re-pointing the ramp re-skins every screen consistently. */
+  --color-indigo-50: #eef4ff;
+  --color-indigo-100: #dce8ff;
+  --color-indigo-200: #bfd4ff;
+  --color-indigo-300: #93b6fd;
+  --color-indigo-400: #5f8ff8;
+  --color-indigo-500: #3a6ff2;
+  --color-indigo-600: #1f57e0;
+  --color-indigo-700: #1945bd;
+  --color-indigo-800: #1a3b97;
+  --color-indigo-900: #1b3577;
+  --color-indigo-950: #121f47;
 
-  /* Purples are never appropriate here — fold them onto the primary ramp so
-     no stray `violet-*` / `purple-*` utility breaks the palette. */
+  /* Violet / purple fold onto the primary so no stray utility breaks the
+     palette (role colours that need violet use explicit values). */
   --color-violet-50: var(--color-indigo-50);
   --color-violet-100: var(--color-indigo-100);
   --color-violet-200: var(--color-indigo-200);
@@ -99,18 +181,18 @@
   --color-pink-500: var(--color-indigo-500);
   --color-pink-600: var(--color-indigo-600);
 
-  /* --- Secondary: steel blue (sky / blue / cyan) ------------------------- */
-  --color-sky-50: oklch(0.976 0.008 235);
-  --color-sky-100: oklch(0.946 0.017 235);
-  --color-sky-200: oklch(0.897 0.031 235);
-  --color-sky-300: oklch(0.822 0.045 236);
-  --color-sky-400: oklch(0.706 0.058 238);
-  --color-sky-500: oklch(0.596 0.066 240);
-  --color-sky-600: oklch(0.510 0.062 242);
-  --color-sky-700: oklch(0.440 0.053 243);
-  --color-sky-800: oklch(0.378 0.044 244);
-  --color-sky-900: oklch(0.322 0.036 245);
-  --color-sky-950: oklch(0.215 0.027 246);
+  /* --- Secondary: aqua (sky / blue / cyan) ------------------------------- */
+  --color-sky-50: #effbff;
+  --color-sky-100: #d9f4fd;
+  --color-sky-200: #b3e8fa;
+  --color-sky-300: #7dd6f5;
+  --color-sky-400: #3dbdec;
+  --color-sky-500: #14a3d9;
+  --color-sky-600: #0a84b8;
+  --color-sky-700: #0c6a94;
+  --color-sky-800: #10587a;
+  --color-sky-900: #124a66;
+  --color-sky-950: #0b2f44;
   --color-blue-50: var(--color-sky-50);
   --color-blue-100: var(--color-sky-100);
   --color-blue-200: var(--color-sky-200);
@@ -134,18 +216,31 @@
   --color-cyan-900: var(--color-sky-900);
   --color-cyan-950: var(--color-sky-950);
 
-  /* --- Signal: moss (healthy / live / paid) ------------------------------ */
-  --color-emerald-50: oklch(0.975 0.012 150);
-  --color-emerald-100: oklch(0.944 0.024 150);
-  --color-emerald-200: oklch(0.893 0.042 149);
-  --color-emerald-300: oklch(0.817 0.058 148);
-  --color-emerald-400: oklch(0.702 0.070 148);
-  --color-emerald-500: oklch(0.602 0.072 148);
-  --color-emerald-600: oklch(0.515 0.065 148);
-  --color-emerald-700: oklch(0.444 0.055 148);
-  --color-emerald-800: oklch(0.382 0.045 149);
-  --color-emerald-900: oklch(0.326 0.037 150);
-  --color-emerald-950: oklch(0.216 0.028 151);
+  /* --- Brand teal (the second colour of the logo) ------------------------ */
+  --color-teal-50: #effdfa;
+  --color-teal-100: #cdf9ef;
+  --color-teal-200: #9cf1df;
+  --color-teal-300: #62e2cb;
+  --color-teal-400: #2fcbb3;
+  --color-teal-500: #14b19b;
+  --color-teal-600: #0c8f7f;
+  --color-teal-700: #0e7268;
+  --color-teal-800: #105b54;
+  --color-teal-900: #124b46;
+  --color-teal-950: #052e2b;
+
+  /* --- Signal: green (healthy / live / paid) ------------------------------ */
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
   --color-green-50: var(--color-emerald-50);
   --color-green-100: var(--color-emerald-100);
   --color-green-200: var(--color-emerald-200);
@@ -157,22 +252,19 @@
   --color-green-800: var(--color-emerald-800);
   --color-green-900: var(--color-emerald-900);
   --color-green-950: var(--color-emerald-950);
-  --color-teal-500: var(--color-emerald-500);
-  --color-teal-600: var(--color-emerald-600);
-  --color-teal-700: var(--color-emerald-700);
 
-  /* --- Signal: clay (caution / pending) ---------------------------------- */
-  --color-amber-50: oklch(0.980 0.014 85);
-  --color-amber-100: oklch(0.956 0.030 85);
-  --color-amber-200: oklch(0.910 0.055 83);
-  --color-amber-300: oklch(0.848 0.078 80);
-  --color-amber-400: oklch(0.775 0.093 76);
-  --color-amber-500: oklch(0.705 0.099 72);
-  --color-amber-600: oklch(0.610 0.093 65);
-  --color-amber-700: oklch(0.505 0.078 60);
-  --color-amber-800: oklch(0.428 0.064 58);
-  --color-amber-900: oklch(0.368 0.052 58);
-  --color-amber-950: oklch(0.242 0.039 58);
+  /* --- Signal: amber (caution / pending) ---------------------------------- */
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+  --color-amber-950: #451a03;
   --color-yellow-50: var(--color-amber-50);
   --color-yellow-100: var(--color-amber-100);
   --color-yellow-200: var(--color-amber-200);
@@ -194,18 +286,18 @@
   --color-orange-800: var(--color-amber-800);
   --color-orange-900: var(--color-amber-900);
 
-  /* --- Signal: brick (cancelled / critical) ------------------------------ */
-  --color-rose-50: oklch(0.972 0.011 25);
-  --color-rose-100: oklch(0.940 0.023 25);
-  --color-rose-200: oklch(0.884 0.041 25);
-  --color-rose-300: oklch(0.806 0.060 25);
-  --color-rose-400: oklch(0.700 0.082 26);
-  --color-rose-500: oklch(0.604 0.101 27);
-  --color-rose-600: oklch(0.522 0.110 28);
-  --color-rose-700: oklch(0.448 0.094 28);
-  --color-rose-800: oklch(0.388 0.077 28);
-  --color-rose-900: oklch(0.334 0.063 28);
-  --color-rose-950: oklch(0.222 0.047 28);
+  /* --- Signal: rose (cancelled / critical) -------------------------------- */
+  --color-rose-50: #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-200: #fecdd3;
+  --color-rose-300: #fda4af;
+  --color-rose-400: #fb7185;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #be123c;
+  --color-rose-800: #9f1239;
+  --color-rose-900: #881337;
+  --color-rose-950: #4c0519;
   --color-red-50: var(--color-rose-50);
   --color-red-100: var(--color-rose-100);
   --color-red-200: var(--color-rose-200);
@@ -218,18 +310,34 @@
   --color-red-900: var(--color-rose-900);
   --color-red-950: var(--color-rose-950);
 
-  /* --- Neutrals: cool clinical paper ------------------------------------- */
-  --color-slate-50: oklch(0.981 0.003 220);
-  --color-slate-100: oklch(0.960 0.004 220);
-  --color-slate-200: oklch(0.913 0.006 220);
-  --color-slate-300: oklch(0.858 0.009 220);
-  --color-slate-400: oklch(0.685 0.014 220);
-  --color-slate-500: oklch(0.556 0.016 220);
-  --color-slate-600: oklch(0.446 0.017 220);
-  --color-slate-700: oklch(0.362 0.017 218);
-  --color-slate-800: oklch(0.272 0.016 214);
-  --color-slate-900: oklch(0.216 0.014 212);
-  --color-slate-950: oklch(0.158 0.012 210);
+  /* --- Accent: coral — the "Book / Pay ₹50" call to action ---------------- */
+  --color-coral-50: #fff4f1;
+  --color-coral-100: #ffe5dd;
+  --color-coral-200: #ffc8b8;
+  --color-coral-300: #ffa289;
+  --color-coral-400: #ff7c5e;
+  --color-coral-500: #f95d3d;
+  --color-coral-600: #e4442a;
+  --color-coral-700: #bf3420;
+  --color-coral-800: #9b2d1f;
+  --color-coral-900: #7e291e;
+
+  /* --- Neutrals: airy blue-grey ------------------------------------------- */
+  --color-slate-50: #f6f8fc;
+  --color-slate-100: #eef2f8;
+  --color-slate-200: #e2e8f2;
+  --color-slate-300: #cbd5e3;
+  --color-slate-400: #94a3bb;
+  --color-slate-500: #64748f;
+  --color-slate-600: #4a5a75;
+  --color-slate-700: #36445e;
+  --color-slate-800: #222e45;
+  --color-slate-900: #152036;
+  --color-slate-950: #0b1427;
+
+  /* --- Shape & depth ------------------------------------------------------ */
+  --shadow-soft: 0 1px 2px rgb(15 27 51 / 0.04), 0 8px 24px -12px rgb(15 27 51 / 0.14);
+  --shadow-lift: 0 2px 4px rgb(15 27 51 / 0.05), 0 18px 40px -18px rgb(31 87 224 / 0.35);
 }
 
 /* -------------------------------------------------------------------------
@@ -245,7 +353,7 @@
     background-color: var(--app-canvas);
     color: var(--app-ink);
     font-family: var(--font-sans);
-    /* Plex ships proper lining/tabular figures — clinical data lines up. */
+    /* Tabular figures keep clinical data aligned. */
     font-feature-settings: "kern", "liga", "calt";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -392,4 +500,135 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* -------------------------------------------------------------------------
+   Brand utilities (public site + patient experience)
+   ------------------------------------------------------------------------- */
+
+/* The logo gradient, for primary surfaces that carry the brand. */
+@utility bg-brand {
+  background-image: linear-gradient(135deg, #1f57e0 0%, #1a7ee6 45%, #14b19b 100%);
+}
+
+@utility text-brand-gradient {
+  background-image: linear-gradient(120deg, #1f57e0 10%, #14b19b 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Soft dotted texture behind hero sections — reads as "clinical", not busy. */
+@utility bg-dots {
+  background-image: radial-gradient(color-mix(in oklab, #1f57e0 14%, transparent) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+/* Subtle cross pattern used on dark brand bands. */
+@utility bg-crosses {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.07) 2px, transparent 2px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.07) 2px, transparent 2px);
+  background-size: 34px 34px;
+  background-position: -16px -16px;
+}
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@utility animate-float {
+  animation: float-y 5s ease-in-out infinite;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* `backwards` for the same reason as page-enter: no lingering transform. */
+@utility animate-fade-up {
+  animation: fade-up 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgb(249 93 61 / 0.45); }
+  70% { box-shadow: 0 0 0 12px rgb(249 93 61 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(249 93 61 / 0); }
+}
+
+@utility animate-pulse-ring {
+  animation: pulse-ring 2.2s ease-out infinite;
+}
+
+@utility shadow-soft {
+  box-shadow: var(--shadow-soft);
+}
+
+@utility shadow-lift {
+  box-shadow: var(--shadow-lift);
+}
+
+/* Older screens use `animate-fadeIn`, which Tailwind does not ship. */
+@utility animate-fadeIn {
+  animation: fade-up 0.35s ease-out backwards;
+}
+
+/* -------------------------------------------------------------------------
+   Dark theme — utilities that do not go through a colour ramp.
+   ------------------------------------------------------------------------- */
+.dark .bg-white,
+.dark .hover\:bg-white:hover,
+.dark .focus\:bg-white:focus {
+  background-color: var(--app-surface);
+}
+.dark .bg-white\/80,
+.dark .bg-white\/90,
+.dark .bg-white\/95 {
+  background-color: color-mix(in oklab, var(--app-surface) 92%, transparent);
+}
+.dark .bg-canvas\/85 {
+  background-color: color-mix(in oklab, var(--app-canvas) 85%, transparent);
+}
+.dark .border-white,
+.dark .ring-white {
+  border-color: var(--app-surface);
+  --tw-ring-color: var(--app-surface);
+}
+.dark .text-slate-950 {
+  color: var(--color-slate-900);
+}
+.dark .from-white {
+  --tw-gradient-from: var(--app-canvas);
+}
+.dark .via-white {
+  --tw-gradient-via: var(--app-canvas);
+}
+.dark .to-white {
+  --tw-gradient-to: var(--app-canvas);
+}
+/* Light-only fills used for solid dark buttons; keep them readable. */
+.dark .bg-slate-900 {
+  background-color: var(--color-indigo-600);
+}
+.dark .bg-slate-800 {
+  background-color: #1d2a44;
+}
+/* Native inputs, selects and placeholders. */
+.dark input,
+.dark select,
+.dark textarea {
+  color: var(--app-ink);
+}
+.dark ::placeholder {
+  color: var(--color-slate-400);
+}
+.dark select option {
+  background-color: var(--app-surface);
+  color: var(--app-ink);
+}
+/* Map tiles and photos stay true-colour, just a touch dimmer. */
+.dark img {
+  filter: brightness(0.94);
 }

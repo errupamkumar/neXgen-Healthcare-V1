@@ -42,6 +42,11 @@ interface DashboardProps {
   onJoinVideo: (appointment: Appointment) => void;
   onCancelAppointment: (id: string) => void;
   onBookAppointment: (bookingData: any) => Promise<any>;
+  /** Moves a booking in place (no second fee, no lost seat if the new slot is full). */
+  onRescheduleAppointment?: (
+    id: string,
+    data: { date: string; timeSlot: string; type: 'visiting' | 'video' }
+  ) => Promise<any>;
 }
 
 // Helper to parse date and timeSlot into a Date object
@@ -108,6 +113,7 @@ export default function Dashboard({
   onJoinVideo,
   onCancelAppointment,
   onBookAppointment,
+  onRescheduleAppointment,
 }: DashboardProps) {
   const [rescheduleAppt, setRescheduleAppt] = useState<Appointment | null>(null);
   const [shareModalAppt, setShareModalAppt] = useState<Appointment | null>(null);
@@ -449,13 +455,11 @@ export default function Dashboard({
               patients={patients}
               initialAppointment={rescheduleAppt}
               onCloseModal={() => setRescheduleAppt(null)}
-              onBookAppointment={async (bookingData) => {
-                if (rescheduleAppt) {
-                  await onCancelAppointment(rescheduleAppt.id);
-                }
-                const res = await onBookAppointment(bookingData);
-                return res;
-              }}
+              /* Reschedule moves the booking in place. The old flow cancelled
+                 first and booked second — charging the fee again, and losing
+                 the original seat whenever the new slot turned out full. */
+              onRescheduleAppointment={onRescheduleAppointment}
+              onBookAppointment={onBookAppointment}
             />
           </div>
         </div>

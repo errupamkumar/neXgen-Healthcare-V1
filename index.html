@@ -5,17 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="neXgen Healthcare — ABDM-integrated OPD scheduling, patient history and telehealth for multispecialty hospitals."
+      content="neXgen Healthcare — book a confirmed OPD token or video consultation with verified doctors near you for just ₹50. Pay the doctor's own fee at the clinic."
     />
-    <meta name="theme-color" content="#f7f9f9" />
-    <title>neXgen Healthcare · Clinical & Telehealth Suite</title>
+    <meta name="theme-color" content="#1f57e0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>neXgen Healthcare · Book a doctor for ₹50</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+    <script>
+      try {
+        var t = localStorage.getItem('nexgen.theme');
+        if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

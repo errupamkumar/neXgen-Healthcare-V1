@@ -261,7 +261,8 @@ export default function PersonaConsole({
    * not reach any screen.
    */
   const platformFeeCollected = useMemo(
-    () => appointments.filter(a => a.feePaid).length * PLATFORM_FEE,
+    // Refunded bookings gave the ₹50 back, so they are not money collected.
+    () => appointments.filter(a => a.feePaid && !a.refundStatus).length * PLATFORM_FEE,
     [appointments]
   );
 
@@ -269,11 +270,31 @@ export default function PersonaConsole({
   const platformFeeByDate = useMemo(() => {
     const byDate = new Map<string, number>();
     appointments
-      .filter(a => a.feePaid)
+      .filter(a => a.feePaid && !a.refundStatus)
       .forEach(a => byDate.set(a.date, (byDate.get(a.date) ?? 0) + PLATFORM_FEE));
     return Array.from(byDate.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, revenue]) => ({ date, revenue }));
+  }, [appointments]);
+
+  /**
+   * Completed consultations and bookings per day, derived from the loaded
+   * appointments. The workspace used to read `stats.completedAppointments` and
+   * `stats.appointmentsByDate`, neither of which /api/hospital/stats returns,
+   * so the "Completed care" tile was blank and the capacity chart empty.
+   */
+  const completedCount = useMemo(
+    () => appointments.filter(a => a.status === 'completed').length,
+    [appointments]
+  );
+  const appointmentsByDate = useMemo(() => {
+    const byDate = new Map<string, number>();
+    appointments
+      .filter(a => a.status !== 'cancelled')
+      .forEach(a => byDate.set(a.date, (byDate.get(a.date) ?? 0) + 1));
+    return Array.from(byDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, count]) => ({ date, count }));
   }, [appointments]);
 
   // UI state managers
@@ -519,7 +540,7 @@ export default function PersonaConsole({
         lastUpdated: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
       }
     }));
-    setReminderNotice(`Reminder set for appointment BK-${reminderModalAppt.id.slice(-6)}! We will notify via ${reminderForm.channel.toUpperCase()}.`);
+    setReminderNotice(`Reminder set for appointment ${reminderModalAppt.bookingNo || 'BK-' + reminderModalAppt.id.slice(-6)}! We will notify via ${reminderForm.channel.toUpperCase()}.`);
     setReminderModalAppt(null);
     setTimeout(() => setReminderNotice(''), 6000);
   };
@@ -649,7 +670,17 @@ export default function PersonaConsole({
       const configRes = await fetch('/api/hospital/config');
       if (configRes.ok) {
         const configData = await configRes.json();
-        setHospitalConfig(configData);
+        // The server stores the clinic phone as `phone` and has no SMS /
+        // telehealth flags, so a straight replace left those form inputs
+        // undefined (React's controlled → uncontrolled warning). Merge over
+        // the defaults and map the phone field across.
+        setHospitalConfig(prev => ({
+          ...prev,
+          ...configData,
+          contactNumber: configData.contactNumber ?? configData.phone ?? prev.contactNumber,
+          enableSms: configData.enableSms ?? prev.enableSms,
+          enableTelehealth: configData.enableTelehealth ?? prev.enableTelehealth,
+        }));
       }
       
       const statsRes = await fetch('/api/hospital/stats');
@@ -1256,7 +1287,7 @@ export default function PersonaConsole({
                                     </span>
                                   )}
                                 </div>
-                                <span className="font-mono text-[10px] font-bold text-slate-400">Ref: BK-{appt.id.slice(-6)}</span>
+                                <span className="font-mono text-[10px] font-bold text-slate-400">Ref: {appt.bookingNo || `BK-${appt.id.slice(-6)}`}</span>
                               </div>
 
                               <div className="flex items-start gap-3">
@@ -1973,7 +2004,7 @@ export default function PersonaConsole({
                             <tr key={appt.id} className="hover:bg-slate-50/70 transition-colors">
                               <td className="p-3">
                                 <div className="font-extrabold text-slate-900 font-mono">
-                                  BK-{appt.id.toUpperCase().slice(-6)}
+                                  {appt.bookingNo || `BK-${appt.id.toUpperCase().slice(-6)}`}
                                 </div>
                                 <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
                                   <Clock className="h-3 w-3 text-slate-400" />
@@ -2002,9 +2033,13 @@ export default function PersonaConsole({
                               <td className="p-3 font-semibold text-slate-500">Paid at clinic</td>
 
                               <td className="p-3">
-                                {appt.feePaid ? (
+                                {appt.status === 'cancelled' && appt.refundStatus ? (
+                                  <span className="inline-flex items-center gap-1 rounded bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700 border border-sky-200">
+                                    REFUND INITIATED
+                                  </span>
+                                ) : appt.feePaid ? (
                                   <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                                    <CheckCircle2 className="h-3 w-3" /> PAID
+                                    <CheckCircle2 className="h-3 w-3" /> {appt.status === 'cancelled' ? 'PAID · CANCELLED' : 'PAID'}
                                   </span>
                                 ) : appt.status === 'cancelled' ? (
                                   <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">
@@ -2045,7 +2080,7 @@ export default function PersonaConsole({
                                   </button>
                                 )}
 
-                                {appt.status === 'completed' && appt.feedbackRating === null && (
+                                {appt.status === 'completed' && appt.feedbackRating == null && (
                                   <button
                                     onClick={() => setFeedbackAppointment(appt)}
                                     className="bg-amber-500 hover:bg-amber-600 text-white rounded px-2.5 py-1 text-[10px] font-bold transition-all cursor-pointer inline-flex items-center gap-1"
@@ -2054,7 +2089,7 @@ export default function PersonaConsole({
                                   </button>
                                 )}
 
-                                {appt.feedbackRating !== null && appt.feedbackRating !== undefined && (
+                                {appt.feedbackRating != null && (
                                   <div className="text-[10px] text-amber-500 font-bold inline-flex items-center gap-0.5">
                                     Rated {appt.feedbackRating} <Star className="h-2.5 w-2.5 fill-amber-500" />
                                   </div>
@@ -3020,7 +3055,7 @@ export default function PersonaConsole({
                   <div className="rounded-lg bg-emerald-50 p-3 text-emerald-600"><CheckCircle className="h-5 w-5" /></div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase">Completed Care</p>
-                    <h3 className="text-xl font-extrabold text-slate-900">{stats.completedAppointments}</h3>
+                    <h3 className="text-xl font-extrabold text-slate-900">{completedCount}</h3>
                   </div>
                 </div>
 
@@ -3071,12 +3106,12 @@ export default function PersonaConsole({
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide">Capacity Monitoring</h3>
                     <h4 className="text-sm font-extrabold text-slate-900">Appointment Volumes by Calendar Date</h4>
                   </div>
-                  {stats.appointmentsByDate?.length === 0 ? (
+                  {appointmentsByDate.length === 0 ? (
                     <div className="h-[250px] flex items-center justify-center text-xs text-slate-400">Waiting for bookings metadata to build metrics.</div>
                   ) : (
                     <div className="h-[250px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={stats.appointmentsByDate} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <BarChart data={appointmentsByDate} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                           <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} />
                           <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />

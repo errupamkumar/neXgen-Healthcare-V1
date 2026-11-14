@@ -68,6 +68,8 @@ interface DoctorQueueProps {
       advice?: string;
     }
   ) => Promise<any>;
+  /** Front desk: record the ₹50 booking fee taken in cash at the counter. */
+  onCollectFee?: (apptId: string) => Promise<any>;
 }
 
 /** "09:00 AM" -> minutes since midnight, so the queue sorts chronologically. */
@@ -436,6 +438,7 @@ export default function DoctorQueue({
   view = 'pending',
   onJoinVideo,
   onCompleteConsultation,
+  onCollectFee,
 }: DoctorQueueProps) {
   // Local calendar day, not the UTC one — see todayLocal(). Appointment dates
   // are plain local days, so comparing them against a UTC key put today's
@@ -723,8 +726,13 @@ export default function DoctorQueue({
                   )}
                 </div>
 
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 font-mono text-sm font-semibold text-indigo-700">
-                  {position + 1}
+                {/* The OPD token the patient was issued — what the desk calls out.
+                    Older bookings without one fall back to queue position. */}
+                <span
+                  title={appt.tokenNo ? `OPD token ${appt.tokenNo}` : `Position ${position + 1} in queue`}
+                  className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 px-2 font-mono text-sm font-semibold text-indigo-700"
+                >
+                  {appt.tokenNo || position + 1}
                 </span>
               </div>
 
@@ -744,6 +752,23 @@ export default function DoctorQueue({
                   {appt.type === 'video' ? 'Video call' : 'In person'}
                 </span>
                 <VisitTypeBadge isFollowUp={followUpIds.has(appt.id)} />
+                {!appt.feePaid && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
+                    ₹50 booking fee due
+                    {onCollectFee && (
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          onCollectFee(appt.id);
+                        }}
+                        className="ml-1 cursor-pointer rounded bg-amber-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-amber-700"
+                      >
+                        Collect
+                      </button>
+                    )}
+                  </span>
+                )}
                 {isLive && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-rose-700">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />

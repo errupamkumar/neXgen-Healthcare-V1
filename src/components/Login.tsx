@@ -29,6 +29,8 @@ import {
 } from 'lucide-react';
 import { LoggedInUser, Doctor, PatientHistory } from '../types';
 import { authConfig } from '../config';
+import { useT } from '../lib/preferences';
+import type { StringKey } from '../i18n/strings';
 
 /**
  * Compare phone numbers on their last ten digits.
@@ -101,13 +103,25 @@ interface LoginProps {
    * disable registration for a screen.
    */
   onRegisterPatient?: (data: { name: string; contact: string }) => Promise<any>;
+  /**
+   * Why the visitor is here — e.g. "Sign in to book Dr. Priya Sundaram". When
+   * set, the screen opens on the patient Mobile & OTP route, the fastest way
+   * in for someone who just wants to finish a booking.
+   */
+  intentMessage?: string;
+  /** Return to the public website. */
+  onBackToSite?: () => void;
 }
 
-export default function Login({ doctors, patients, onLoginSuccess, onRegisterPatient }: LoginProps) {
+export default function Login({ doctors, patients, onLoginSuccess, onRegisterPatient, intentMessage, onBackToSite }: LoginProps) {
+  const t = useT();
+  const roleLabel = (role: LoggedInUser['role']) => t(`role.${role}` as StringKey);
   // Tabs for standard login: 'patient' | 'doctor' | 'hospital' | 'admin'
   const [selectedRole, setSelectedRole] = useState<'patient' | 'doctor' | 'hospital' | 'admin'>('patient');
 
-  const [authMode, setAuthMode] = useState<AuthMode>('password');
+  const [authMode, setAuthMode] = useState<AuthMode>(
+    intentMessage && authConfig.otpLoginEnabled ? 'otp' : 'password'
+  );
 
   // Input fields
   // Prefilled with the default patient account (see demoAccounts below).
@@ -245,7 +259,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
       if (match) {
         triggerLoginSuccess(match);
       } else {
-        setErrorMsg('Invalid credentials. Please click "View Demo Credentials" below to use standard sandbox accounts.');
+        setErrorMsg(t('login.err.invalid'));
       }
     }
   };
@@ -314,16 +328,16 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
     setErrorMsg('');
 
     if (phoneKey(mobile).length < 10) {
-      setErrorMsg('Enter a 10-digit mobile number.');
+      setErrorMsg(t('login.err.mobile10'));
       return;
     }
     if (!findPatientByMobile(mobile)) {
-      setErrorMsg('No patient is registered against this mobile number. Use "Register" below to create a profile.');
+      setErrorMsg(t('login.err.noPatient'));
       return;
     }
 
     setOtpSent(true);
-    setSuccessMsg(`OTP sent to ${mobile}. Use the demo code ${authConfig.demoOtp}.`);
+    setSuccessMsg(t('login.ok.otpSent', { mobile, otp: authConfig.demoOtp }));
   };
 
   const handleVerifyOtp = (e: React.FormEvent) => {
@@ -331,7 +345,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
     setErrorMsg('');
 
     if (otp.trim() !== authConfig.demoOtp) {
-      setErrorMsg('That OTP is not correct. Please try again.');
+      setErrorMsg(t('login.err.otp'));
       return;
     }
 
@@ -357,20 +371,20 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
     setErrorMsg('');
 
     if (!regName.trim()) {
-      setErrorMsg('Please enter your full name.');
+      setErrorMsg(t('login.err.name'));
       return;
     }
     if (phoneKey(regMobile).length < 10) {
-      setErrorMsg('Enter a 10-digit mobile number.');
+      setErrorMsg(t('login.err.mobile10'));
       return;
     }
     if (findPatientByMobile(regMobile)) {
-      setErrorMsg('This mobile number already has a profile. Sign in with Mobile & OTP instead.');
+      setErrorMsg(t('login.err.exists'));
       return;
     }
 
     setRegOtpSent(true);
-    setSuccessMsg(`OTP sent to ${regMobile}. Use the demo code ${authConfig.demoOtp}.`);
+    setSuccessMsg(t('login.ok.otpSent', { mobile: regMobile, otp: authConfig.demoOtp }));
   };
 
   const handleConfirmRegistration = async (e: React.FormEvent) => {
@@ -378,7 +392,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
     setErrorMsg('');
 
     if (regOtp.trim() !== authConfig.demoOtp) {
-      setErrorMsg('That OTP is not correct. Please try again.');
+      setErrorMsg(t('login.err.otp'));
       return;
     }
     if (!onRegisterPatient) {
@@ -407,7 +421,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-slate-50 font-sans">
+    <div className="min-h-[calc(100svh-4rem)] w-full flex flex-col lg:flex-row bg-slate-50 font-sans">
 
       {/* ========================================================= */}
       {/* ROLE PORTAL SWITCHER — rendered into the app header bar    */}
@@ -418,7 +432,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
         <HeaderSlot>
           <nav aria-label="Select role portal" className="flex min-w-0 items-center gap-2">
             <span className="hidden shrink-0 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 xl:inline">
-              Role portal
+              {t('login.rolePortal')}
             </span>
             <div className="flex items-center gap-0.5 rounded-xl border border-slate-200/80 bg-slate-100 p-1">
               {ROLE_OPTIONS.map(role => {
@@ -432,7 +446,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
                     // The label is dropped on narrow screens so four tabs still
                     // fit a phone header; the icon keeps its accessible name.
                     aria-label={`${role.label} portal`}
-                    title={`${role.label} portal`}
+                    title={roleLabel(role.id)}
                     className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-extrabold transition-all ${
                       isSelected
                         ? 'bg-indigo-600 text-white shadow-xs'
@@ -440,7 +454,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
                     }`}
                   >
                     <role.icon className="h-4 w-4 shrink-0" />
-                    <span className="hidden sm:inline">{role.label}</span>
+                    <span className="hidden sm:inline">{roleLabel(role.id)}</span>
                   </button>
                 );
               })}
@@ -453,7 +467,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
       {/* ========================================================= */}
       {/* LEFT SIDE: BRANDING, HERO IMAGE & TAGLINE                 */}
       {/* ========================================================= */}
-      <div className="w-full lg:w-3/5 bg-gradient-to-br from-sky-100 via-blue-50 to-sky-200 text-slate-900 relative flex flex-col justify-between p-8 sm:p-12 lg:p-16 overflow-hidden min-h-[380px] lg:min-h-screen border-b lg:border-b-0 lg:border-r border-sky-200">
+      <div className="w-full lg:w-3/5 bg-gradient-to-br from-indigo-100 via-white to-teal-100 text-slate-900 relative flex flex-col justify-between p-8 sm:p-12 lg:p-16 overflow-hidden min-h-[380px] lg:min-h-[calc(100svh-4rem)] border-b lg:border-b-0 lg:border-r border-indigo-100">
         
         {/* Background Image with Light Blue Gradient Overlay */}
         <div 
@@ -462,13 +476,13 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
             backgroundImage: `url('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=1600')` 
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-sky-200/90 via-sky-100/70 to-blue-50/80" />
+        <div className="absolute inset-0 bg-gradient-to-t from-indigo-100/90 via-white/70 to-teal-50/80" />
 
         {/* Top status strip — the wordmark now lives in the app shell header. */}
         <div className="relative z-10 flex items-center justify-end">
           <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 backdrop-blur-md border border-sky-200 text-xs font-bold text-slate-700 shadow-2xs">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>OPD Live Queue</span>
+            <span>{t('login.live')}</span>
           </div>
         </div>
 
@@ -476,15 +490,15 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
         <div className="relative z-10 my-auto py-8 space-y-6 max-w-xl">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-200/70 border border-sky-300 text-sky-900 text-xs font-extrabold backdrop-blur-md shadow-2xs">
             <BadgeCheck className="h-4 w-4 text-sky-700" />
-            <span>Unified Healthcare Access System</span>
+            <span>{t('login.hero.badge')}</span>
           </div>
 
           <div className="space-y-3">
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-              Smart OPD & Token Booking
+              {t('login.hero.title1')} <span className="text-brand-gradient">{t('login.hero.title2')}</span>
             </h1>
             <p className="text-sm sm:text-base text-slate-700 leading-relaxed font-medium">
-              Streamlining patient OPD appointments with online token reservation, transparent offline doctor fee collection, and digital medical records.
+              {t('login.hero.text')}
             </p>
           </div>
 
@@ -496,25 +510,25 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
             <div className="p-3.5 rounded-2xl bg-white/80 border border-sky-200/90 backdrop-blur-md space-y-1 shadow-2xs">
               <div className="flex items-center gap-2 text-sky-800 font-black text-xs">
                 <CreditCard className="h-4 w-4 shrink-0 text-sky-600" />
-                <span>Online Slot Booking</span>
+                <span>{t('login.f1.t')}</span>
               </div>
-              <p className="text-[11px] text-slate-600 font-medium leading-snug">Instant online reservation fee for confirmed OPD queue slot.</p>
+              <p className="text-[11px] text-slate-600 font-medium leading-snug">{t('login.f1.d')}</p>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-white/80 border border-sky-200/90 backdrop-blur-md space-y-1 shadow-2xs">
               <div className="flex items-center gap-2 text-teal-800 font-black text-xs">
                 <Building className="h-4 w-4 shrink-0 text-teal-600" />
-                <span>Offline OPD Fee</span>
+                <span>{t('login.f2.t')}</span>
               </div>
-              <p className="text-[11px] text-slate-600 font-medium leading-snug">Doctor’s fee is paid at the clinic reception — never online.</p>
+              <p className="text-[11px] text-slate-600 font-medium leading-snug">{t('login.f2.d')}</p>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-white/80 border border-sky-200/90 backdrop-blur-md space-y-1 shadow-2xs">
               <div className="flex items-center gap-2 text-blue-800 font-black text-xs">
                 <FileText className="h-4 w-4 shrink-0 text-blue-600" />
-                <span>Digital Vault</span>
+                <span>{t('login.f3.t')}</span>
               </div>
-              <p className="text-[11px] text-slate-600 font-medium leading-snug">Instant access to medical records, lab reports & e-prescriptions.</p>
+              <p className="text-[11px] text-slate-600 font-medium leading-snug">{t('login.f3.d')}</p>
             </div>
           </div>
         </div>
@@ -532,15 +546,33 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
       <div className="w-full lg:w-2/5 flex flex-col justify-center p-6 sm:p-10 lg:p-12 bg-white lg:border-l border-slate-200/80">
         <div className="max-w-md w-full mx-auto space-y-6">
           
+          {onBackToSite && (
+            <button
+              type="button"
+              onClick={onBackToSite}
+              className="inline-flex cursor-pointer items-center gap-1.5 text-[12px] font-bold text-slate-500 hover:text-indigo-700"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> {t('login.back')}
+            </button>
+          )}
+
+          {intentMessage && (
+            <div className="flex items-start gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+              <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+              <div>
+                <p className="text-sm font-bold text-indigo-950">{intentMessage}</p>
+                <p className="mt-0.5 text-[12px] text-indigo-900/75">{t('login.intentHint')}</p>
+              </div>
+            </div>
+          )}
+
           {/* Header Title */}
           <div className="space-y-1.5">
             <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-              {authMode === 'register' ? 'Create Your Patient Profile' : 'Sign In to Account'}
+              {authMode === 'register' ? t('login.titleRegister') : t('login.title')}
             </h2>
             <p className="text-xs text-slate-500 font-medium">
-              {authMode === 'register'
-                ? 'Your name and mobile number are all we need to start. You can complete the rest of your profile once you are in.'
-                : 'Access patient records, doctor OPD schedules, or front desk billing console.'}
+              {authMode === 'register' ? t('login.subRegister') : t('login.sub')}
             </p>
           </div>
 
@@ -549,12 +581,12 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
           {authConfig.otpLoginEnabled && authMode !== 'register' && (
             <div className="space-y-2">
               <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
-                Sign In Method
+                {t('login.method')}
               </label>
               <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80">
                 {[
-                  { id: 'password' as const, label: 'User ID & Password', icon: Lock },
-                  { id: 'otp' as const, label: 'Mobile & OTP', icon: Smartphone },
+                  { id: 'password' as const, label: t('login.method.password'), icon: Lock },
+                  { id: 'otp' as const, label: t('login.method.otp'), icon: Smartphone },
                 ].map(option => {
                   const isSelected = authMode === option.id;
                   return (
@@ -600,7 +632,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
             <form className="space-y-4" onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
               <div className="space-y-1.5">
                 <label htmlFor="mobile" className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                  Registered Mobile Number
+                  {t('login.mobile')}
                 </label>
                 <div className="relative rounded-xl">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -618,14 +650,14 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
                   />
                 </div>
                 <p className="text-[11px] text-slate-500 font-medium px-1">
-                  Patients sign in with the mobile number on their clinic record.
+                  {t('login.mobileHint')}
                 </p>
               </div>
 
               {otpSent && (
                 <div className="space-y-1.5">
                   <label htmlFor="otp" className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                    One-Time Password
+                    {t('login.otp')}
                   </label>
                   <div className="relative rounded-xl">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -644,7 +676,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
                     />
                   </div>
                   <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 font-bold">
-                    Sandbox: no SMS is sent. Use <span className="font-mono">{authConfig.demoOtp}</span>.
+                    {t('login.sandbox')} <span className="font-mono">{authConfig.demoOtp}</span>.
                   </p>
                 </div>
               )}
@@ -653,7 +685,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
                 type="submit"
                 className="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-xl shadow-md shadow-indigo-200 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-all cursor-pointer"
               >
-                <span>{otpSent ? 'Verify OTP & Sign In' : 'Send OTP'}</span>
+                <span>{otpSent ? t('login.verify') : t('login.sendOtp')}</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
 
@@ -663,7 +695,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
                   onClick={() => { setOtpSent(false); setOtp(''); setSuccessMsg(''); }}
                   className="w-full text-[11px] font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
                 >
-                  Change mobile number
+                  {t('login.changeMobile')}
                 </button>
               )}
             </form>
@@ -674,7 +706,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
             <form className="space-y-4" onSubmit={regOtpSent ? handleConfirmRegistration : handleSendRegistrationOtp}>
               <div className="space-y-1.5">
                 <label htmlFor="regName" className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                  Full Name
+                  {t('login.fullName')}
                 </label>
                 <div className="relative rounded-xl">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -694,7 +726,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
 
               <div className="space-y-1.5">
                 <label htmlFor="regMobile" className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                  Mobile Number
+                  {t('login.mobileNumber')}
                 </label>
                 <div className="relative rounded-xl">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -716,7 +748,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
               {regOtpSent && (
                 <div className="space-y-1.5">
                   <label htmlFor="regOtp" className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                    Confirm With OTP
+                    {t('login.confirmOtp')}
                   </label>
                   <div className="relative rounded-xl">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -735,7 +767,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
                     />
                   </div>
                   <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 font-bold">
-                    Sandbox: no SMS is sent. Use <span className="font-mono">{authConfig.demoOtp}</span>.
+                    {t('login.sandbox')} <span className="font-mono">{authConfig.demoOtp}</span>.
                   </p>
                 </div>
               )}
@@ -746,7 +778,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
                 className="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-xl shadow-md shadow-indigo-200 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-all cursor-pointer disabled:opacity-60"
               >
                 {isRegistering && <Loader2 className="h-4 w-4 animate-spin" />}
-                <span>{regOtpSent ? 'Confirm & Create Profile' : 'Send OTP'}</span>
+                <span>{regOtpSent ? t('login.create') : t('login.sendOtp')}</span>
                 {!isRegistering && <ArrowRight className="h-4 w-4" />}
               </button>
 
@@ -756,7 +788,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
                 className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Back to sign in
+                {t('login.backToSignIn')}
               </button>
             </form>
           )}
@@ -766,7 +798,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
           <form className="space-y-4" onSubmit={handleFormSubmit}>
             <div className="space-y-1.5">
               <label htmlFor="email" className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                Email Address
+                {t('login.email')}
               </label>
               <div className="relative rounded-xl">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -786,7 +818,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
 
             <div className="space-y-1.5">
               <label htmlFor="password" className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                Password
+                {t('login.password')}
               </label>
               <div className="relative rounded-xl">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -808,7 +840,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
               type="submit"
               className="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-xl shadow-md shadow-indigo-200 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-all cursor-pointer"
             >
-              <span>Sign In to neXgen-HealthCare</span>
+              <span>{t('login.submit')}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
@@ -823,7 +855,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
               className="w-full flex items-center justify-center gap-2 text-xs font-bold text-indigo-700 bg-indigo-50/70 hover:bg-indigo-50 border border-indigo-200/80 px-4 py-2.5 rounded-xl transition-all cursor-pointer"
             >
               <UserPlus className="h-4 w-4 text-indigo-600" />
-              <span>New patient? Register here</span>
+              <span>{t('login.register')}</span>
             </button>
           )}
 
@@ -836,7 +868,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
             >
               <span className="flex items-center gap-2">
                 <Key className="h-4 w-4 text-indigo-600" />
-                <span>Need demo login credentials?</span>
+                <span>{t('login.demo')}</span>
               </span>
               {showDemoCredentials ? (
                 <ChevronUp className="h-4 w-4 text-indigo-600" />
@@ -896,14 +928,6 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
                       </span>
                     </div>
                   ))}
-                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-1">
-                    <span className="text-slate-600 font-medium">Desk: <strong className="text-slate-800">frontdesk@nexgenhealth.in</strong></span>
-                    <span className="font-mono font-bold text-indigo-600 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[10px]">frontdesk123</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-600 font-medium">Admin: <strong className="text-slate-800">admin@nexgenhealth.in</strong></span>
-                    <span className="font-mono font-bold text-indigo-600 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[10px]">admin123</span>
-                  </div>
                 </div>
 
               </div>

@@ -52,7 +52,86 @@ function slotStartTime(date: string, timeSlot: string): Date {
   return start;
 }
 
-app.use(express.json());
+/** A patient may cancel for a full refund of the ₹50 up to this long before the slot. */
+const FREE_CANCEL_HOURS = 2;
+
+/** Last ten digits — "+91 98201 45678" and "9820145678" are the same phone. */
+function phoneKey(value: string): string {
+  return String(value || '').replace(/\D/g, '').slice(-10);
+}
+
+/**
+ * A booking number that is unique across the data file. The client used to
+ * mint its own random number, so two tabs could, in principle, collide.
+ */
+function generateBookingNo(data: any): string {
+  const taken = new Set((data.appointments || []).map((a: any) => a.bookingNo));
+  for (let i = 0; i < 50; i++) {
+    const candidate = `BK-NXG-${Math.floor(100000 + Math.random() * 900000)}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `BK-NXG-${Date.now().toString().slice(-8)}`;
+}
+
+/**
+ * OPD token for a doctor's day, issued in booking order: T-01, T-02, ...
+ *
+ * Cancelled bookings keep their number (a token handed to a patient is never
+ * re-issued to someone else), so the next token is one past the highest issued.
+ */
+function nextTokenNo(data: any, doctorId: string, date: string): string {
+  const issued = (data.appointments || [])
+    .filter((a: any) => a.doctorId === doctorId && a.date === date && a.tokenNo)
+    .map((a: any) => parseInt(String(a.tokenNo).replace(/\D/g, ''), 10))
+    .filter((n: number) => Number.isFinite(n));
+  const next = (issued.length ? Math.max(...issued) : 0) + 1;
+  return `T-${String(next).padStart(2, '0')}`;
+}
+
+/**
+ * Everything that makes a doctor + date + slot bookable, shared by booking and
+ * rescheduling so the two can never drift apart. Returns an error message, or
+ * null when the slot can be taken. `ignoreAppointmentId` lets a reschedule
+ * leave its own seat out of the capacity count.
+ */
+function slotProblem(
+  data: any,
+  doctor: any,
+  date: string,
+  timeSlot: string,
+  type: string,
+  ignoreAppointmentId?: string
+): string | null {
+  if (!doctor) return 'Selected doctor not found.';
+  if (doctor.isActive === false) return `${doctor.name} is not taking bookings right now.`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return 'Please choose a valid date.';
+  if (Array.isArray(doctor.slots) && doctor.slots.length > 0 && !doctor.slots.includes(timeSlot)) {
+    return `${timeSlot} is not one of ${doctor.name}'s OPD timings.`;
+  }
+  if (type === 'video' && !doctor.videoEnabled) {
+    return `${doctor.name} does not offer video consultations.`;
+  }
+  // A booking must start in the future. The forms already grey out slots that
+  // have begun, but a stale browser tab left open past a slot would otherwise
+  // post one — and every "upcoming" list in the app assumes this holds.
+  if (slotStartTime(date, timeSlot).getTime() <= Date.now()) {
+    return 'That slot has already started. Please choose a later time.';
+  }
+  const bookedCount = (data.appointments || []).filter(
+    (a: any) =>
+      a.id !== ignoreAppointmentId &&
+      a.doctorId === doctor.id &&
+      a.date === date &&
+      a.timeSlot === timeSlot &&
+      a.status !== 'cancelled'
+  ).length;
+  if (bookedCount >= (doctor.maxSchedulesPerSlot || 1)) {
+    return `Slot is fully booked. Only ${doctor.maxSchedulesPerSlot} bookings are allowed per slot for ${doctor.name}.`;
+  }
+  return null;
+}
+
+app.use(express.json({ limit: '2mb' }));
 
 // Initialize Gemini SDK lazily to avoid crashing on startup if key is missing
 let aiClient: GoogleGenAI | null = null;
@@ -474,6 +553,9 @@ function loadData() {
       if (!parsed.messages) {
         parsed.messages = [];
       }
+      if (!parsed.doctorApplications) {
+        parsed.doctorApplications = [];
+      }
       return parsed;
     }
   } catch (err) {
@@ -489,6 +571,7 @@ function loadData() {
     waitlist: [],
     notifications: [],
     messages: [],
+    doctorApplications: [],
     hospitalConfig: DEFAULT_HOSPITAL_CONFIG,
   };
   saveData(initialState);
@@ -791,42 +874,44 @@ app.post('/api/appointments', (req, res) => {
     bookingNo,
   } = req.body;
 
-  if (!doctorId || !date || !timeSlot || !patientName || !patientAge || !patientContact) {
+  if (!doctorId || !date || !timeSlot || !String(patientName || '').trim() || !patientAge || !patientContact) {
     return res.status(400).json({ error: 'Missing required appointment booking fields.' });
   }
-
-  // A booking must start in the future. The forms already grey out slots that
-  // have begun, but a stale browser tab left open past a slot would otherwise
-  // post one — and every "upcoming" list in the app assumes this holds.
-  if (slotStartTime(date, timeSlot).getTime() <= Date.now()) {
-    return res.status(400).json({
-      error: 'That slot has already started. Please choose a later time.',
-    });
+  const ageNumber = Number(patientAge);
+  if (!Number.isFinite(ageNumber) || ageNumber <= 0 || ageNumber > 120) {
+    return res.status(400).json({ error: 'Please enter a valid age between 1 and 120.' });
+  }
+  if (phoneKey(patientContact).length < 10) {
+    return res.status(400).json({ error: 'Please enter a valid 10-digit mobile number.' });
   }
 
-  // Fetch doctor to check slot capacity
   const doctor = data.doctors.find((d: any) => d.id === doctorId);
   if (!doctor) {
     return res.status(404).json({ error: 'Selected doctor not found.' });
   }
-
-  // Check slot capacity limit
-  const bookedCount = data.appointments.filter(
-    (appt: any) => appt.doctorId === doctorId && appt.date === date && appt.timeSlot === timeSlot && appt.status !== 'cancelled'
-  ).length;
-
-  if (bookedCount >= doctor.maxSchedulesPerSlot) {
-    return res.status(400).json({
-      error: `Slot is fully booked. Only ${doctor.maxSchedulesPerSlot} schedules allowed per slot for ${doctor.name}.`,
-    });
+  const problem = slotProblem(data, doctor, date, timeSlot, type || 'visiting');
+  if (problem) {
+    return res.status(400).json({ error: problem });
   }
 
   // Ensure patient profile exists or create one automatically
-  let resolvedPatientId = patientId;
+  let resolvedPatientId = patientId && patientId !== 'new' ? patientId : '';
+  if (resolvedPatientId) {
+    const profile = data.patients.find((p: any) => p.id === resolvedPatientId);
+    if (!profile) {
+      return res.status(404).json({ error: 'Patient profile not found. Please sign in again.' });
+    }
+    // A self-registered profile starts without an age; the booking form asks
+    // for it, so keep it on the profile too.
+    if (!Number(profile.age)) profile.age = ageNumber;
+  }
   if (!resolvedPatientId) {
-    // See if there's an existing patient with this name & contact
+    // Same person = same name on the same phone (compared on the last ten
+    // digits, so "+91 98201 45678" matches "9820145678").
     const existingPatient = data.patients.find(
-      (p: any) => p.name.toLowerCase() === patientName.toLowerCase() && p.contact === patientContact
+      (p: any) =>
+        String(p.name || '').toLowerCase() === String(patientName).trim().toLowerCase() &&
+        phoneKey(p.contact) === phoneKey(patientContact)
     );
     if (existingPatient) {
       resolvedPatientId = existingPatient.id;
@@ -849,40 +934,73 @@ app.post('/api/appointments', (req, res) => {
     }
   }
 
-  const generatedBookingNo = bookingNo || `BK-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+  // One booking per patient, per doctor, per day. A double-tap on "Pay" or a
+  // second tab would otherwise take two seats and charge ₹50 twice.
+  const duplicate = data.appointments.find(
+    (a: any) =>
+      a.patientId === resolvedPatientId &&
+      a.doctorId === doctorId &&
+      a.date === date &&
+      a.status === 'scheduled'
+  );
+  if (duplicate) {
+    return res.status(409).json({
+      error: `You already have a booking with ${doctor.name} on this day (${duplicate.timeSlot}, ${duplicate.bookingNo}). Reschedule it instead of booking again.`,
+    });
+  }
+
+  // Money: the ₹50 platform fee is the only amount this system ever charges,
+  // whatever the client sends. "Pay at counter" holds the seat with the fee
+  // still due — it is not money received.
+  const payAtCounter = /counter/i.test(String(paymentMethod || ''));
+  const nowIso = new Date().toISOString();
 
   const appointment = {
     id: 'appt-' + Date.now(),
-    bookingNo: generatedBookingNo,
+    bookingNo: generateBookingNo(data),
+    tokenNo: nextTokenNo(data, doctorId, date),
     doctorId,
     patientId: resolvedPatientId,
     date,
     timeSlot,
     status: 'scheduled',
-    type: type || 'visiting',
-    patientName,
-    patientAge: Number(patientAge),
-    patientContact,
+    type: type === 'video' ? 'video' : 'visiting',
+    patientName: String(patientName).trim(),
+    patientAge: ageNumber,
+    patientContact: String(patientContact).trim(),
     notes: notes || '',
-    documentIds: documentIds || [],
+    documentIds: Array.isArray(documentIds) ? documentIds : [],
     isRevisit: Boolean(isRevisit),
     previousBookingId: previousBookingId || '',
     uploadedReportNames: Array.isArray(uploadedReportNames) ? uploadedReportNames : [],
     prescriptionNames: Array.isArray(prescriptionNames) ? prescriptionNames : [],
     paymentMethod: paymentMethod || 'UPI Instant',
-    baseFee: Number(baseFee || doctor.fee || 1000),
-    discountAmount: Number(discountAmount || 0),
-    taxAmount: Number(taxAmount || 0),
-    totalAmount: Number(totalAmount || (doctor.fee || 1000)),
-    feePaid: true,
-    amountPaid: Number(totalAmount || (doctor.fee || 1000)),
-    paymentDate: new Date().toISOString(),
+    platformFee: PLATFORM_FEE,
+    discountAmount: 0,
+    taxAmount: 0,
+    totalAmount: PLATFORM_FEE,
+    feePaid: !payAtCounter,
+    amountPaid: payAtCounter ? 0 : PLATFORM_FEE,
+    paymentDate: payAtCounter ? undefined : nowIso,
+    bookedAt: nowIso,
+    bookedBy: ['hospital', 'admin'].includes(req.body.bookedByRole) ? req.body.bookedByRole : 'patient',
   };
 
   data.appointments.push(appointment);
   saveData(data);
   res.json(appointment);
 });
+
+/**
+ * Whether cancelling now earns the ₹50 back. Exported as a rule rather than
+ * computed on the client so the receipt, the patient card and the desk all
+ * agree.
+ */
+function refundDue(appt: any): boolean {
+  if (!appt.feePaid) return false;
+  const hoursAhead = (slotStartTime(appt.date, appt.timeSlot).getTime() - Date.now()) / 3_600_000;
+  return hoursAhead >= FREE_CANCEL_HOURS;
+}
 
 // Cancel appointment
 app.post('/api/appointments/:id/cancel', (req, res) => {
@@ -893,10 +1011,80 @@ app.post('/api/appointments/:id/cancel', (req, res) => {
   if (!appt) {
     return res.status(404).json({ error: 'Appointment not found' });
   }
+  if (appt.status !== 'scheduled') {
+    return res.status(400).json({ error: `This appointment is already ${appt.status} and cannot be cancelled.` });
+  }
 
+  // Staff may cancel a slot that has started (the patient never turned up, the
+  // doctor was called away); a patient cannot cancel once the slot has begun.
+  const actorRole = req.body?.actorRole;
+  const isStaff = ['hospital', 'admin', 'doctor'].includes(actorRole);
+  if (!isStaff && slotStartTime(appt.date, appt.timeSlot).getTime() <= Date.now()) {
+    return res.status(400).json({ error: 'This slot has already started and can no longer be cancelled online. Please contact the clinic.' });
+  }
+
+  const refund = refundDue(appt) || (isStaff && appt.feePaid);
   appt.status = 'cancelled';
+  appt.cancelledAt = new Date().toISOString();
+  appt.cancelledBy = isStaff ? actorRole : 'patient';
+  appt.cancelReason = String(req.body?.reason || '').slice(0, 300);
+  if (refund) {
+    appt.refundStatus = 'initiated';
+    appt.refundAmount = PLATFORM_FEE;
+  }
+
   // Trigger waitlist alert
   processWaitlistNotifications(data, appt.doctorId, appt.date, appt.timeSlot);
+  saveData(data);
+  res.json(appt);
+});
+
+/**
+ * Move a booking to another date/slot with the same doctor.
+ *
+ * The ₹50 already paid carries over — rescheduling used to cancel the old
+ * booking and create a new one, charging the fee again and losing the original
+ * if the new slot turned out to be full.
+ */
+app.post('/api/appointments/:id/reschedule', (req, res) => {
+  const data = loadData();
+  const appt = data.appointments.find((a: any) => a.id === req.params.id);
+  if (!appt) {
+    return res.status(404).json({ error: 'Appointment not found' });
+  }
+  if (appt.status !== 'scheduled') {
+    return res.status(400).json({ error: `Only scheduled appointments can be rescheduled (this one is ${appt.status}).` });
+  }
+
+  const { date, timeSlot, type } = req.body || {};
+  const doctorId = req.body?.doctorId || appt.doctorId;
+  const doctor = data.doctors.find((d: any) => d.id === doctorId);
+  const newType = type === 'video' || type === 'visiting' ? type : appt.type;
+
+  if (doctorId === appt.doctorId && date === appt.date && timeSlot === appt.timeSlot && newType === appt.type) {
+    return res.status(400).json({ error: 'Please pick a different date or time.' });
+  }
+
+  const problem = slotProblem(data, doctor, date, timeSlot, newType, appt.id);
+  if (problem) {
+    return res.status(400).json({ error: problem });
+  }
+
+  const from = { doctorId: appt.doctorId, date: appt.date, timeSlot: appt.timeSlot, type: appt.type, tokenNo: appt.tokenNo };
+  const dayChanged = doctorId !== appt.doctorId || date !== appt.date;
+  // Issue the new day's token BEFORE moving the row, so its old token (from
+  // another day) is not counted against the new day's sequence.
+  const newToken = dayChanged ? nextTokenNo(data, doctorId, date) : appt.tokenNo;
+
+  appt.rescheduleHistory = [...(appt.rescheduleHistory || []), { ...from, at: new Date().toISOString() }];
+  appt.doctorId = doctorId;
+  appt.date = date;
+  appt.timeSlot = timeSlot;
+  appt.type = newType;
+  appt.tokenNo = newToken;
+
+  // The seat they left is now free for someone on the waitlist.
+  processWaitlistNotifications(data, from.doctorId, from.date, from.timeSlot);
   saveData(data);
   res.json(appt);
 });
@@ -1012,7 +1200,8 @@ app.post('/api/waitlist', (req, res) => {
   const entry = {
     id: 'wl-' + Date.now(),
     doctorId,
-    patientId: patientId || ('patient-' + Date.now()),
+    // 'new' is the booking form's "someone new" picker value, not an id.
+    patientId: patientId && patientId !== 'new' ? patientId : '',
     patientName,
     patientContact: patientContact || '',
     date,
@@ -1388,6 +1577,138 @@ app.post('/api/doctors/:id/profile', (req, res) => {
   res.json(doc);
 });
 
+// ================= DOCTOR ONBOARDING =================
+/**
+ * "Join as a doctor" — a public application a clinician submits from the
+ * website. Nothing goes live until an administrator approves it, at which point
+ * the application becomes a real Doctor row in the directory.
+ *
+ * There is deliberately no fee field anywhere in this flow: the platform never
+ * sets, sees or touches a doctor's consultation charge. Patients pay the doctor
+ * at the clinic exactly as before; the platform only takes its ₹50 booking fee.
+ */
+const APPLICATION_TEXT_FIELDS = [
+  'name', 'specialty', 'department', 'qualification', 'registrationNo', 'phone', 'email',
+  'hospital', 'addressLine', 'area', 'landmark', 'district', 'state', 'pincode', 'bio',
+];
+
+app.get('/api/doctor-applications', (req, res) => {
+  const data = loadData();
+  res.json(data.doctorApplications || []);
+});
+
+app.post('/api/doctor-applications', (req, res) => {
+  const data = loadData();
+  const body = req.body || {};
+  const clean: Record<string, string> = {};
+  for (const field of APPLICATION_TEXT_FIELDS) {
+    clean[field] = String(body[field] ?? '').trim().slice(0, field === 'bio' ? 1000 : 200);
+  }
+
+  if (!clean.name || !clean.specialty || !clean.registrationNo || !clean.hospital) {
+    return res.status(400).json({ error: 'Name, speciality, medical registration number and clinic name are required.' });
+  }
+  if (phoneKey(clean.phone).length < 10) {
+    return res.status(400).json({ error: 'Please enter a valid 10-digit mobile number.' });
+  }
+  if (clean.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean.email)) {
+    return res.status(400).json({ error: 'Please enter a valid email address.' });
+  }
+
+  const open = (data.doctorApplications || []).find(
+    (a: any) => a.status === 'pending' && (phoneKey(a.phone) === phoneKey(clean.phone) || a.registrationNo.toLowerCase() === clean.registrationNo.toLowerCase())
+  );
+  if (open) {
+    return res.status(409).json({ error: 'An application with this mobile number or registration number is already under review. We will call you shortly.' });
+  }
+
+  const slots = Array.isArray(body.slots)
+    ? body.slots.map((s: any) => String(s).trim()).filter((s: string) => /^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(s))
+    : [];
+
+  const application = {
+    id: 'app-' + Date.now(),
+    ...clean,
+    district: clean.district || 'Purnea',
+    state: clean.state || 'Bihar',
+    experienceYears: Number(body.experienceYears) > 0 ? Math.min(70, Number(body.experienceYears)) : undefined,
+    videoEnabled: body.videoEnabled !== false,
+    slots: slots.length ? slots : ['10:00 AM', '11:00 AM', '12:00 PM', '05:00 PM', '06:00 PM'],
+    maxSchedulesPerSlot: Number(body.maxSchedulesPerSlot) > 0 ? Math.min(20, Number(body.maxSchedulesPerSlot)) : 4,
+    status: 'pending',
+    submittedAt: new Date().toISOString(),
+  };
+
+  data.doctorApplications.unshift(application);
+  saveData(data);
+  res.json(application);
+});
+
+app.post('/api/doctor-applications/:id/approve', (req, res) => {
+  const data = loadData();
+  const application = (data.doctorApplications || []).find((a: any) => a.id === req.params.id);
+  if (!application) {
+    return res.status(404).json({ error: 'Application not found' });
+  }
+  if (application.status !== 'pending') {
+    return res.status(400).json({ error: `This application was already ${application.status}.` });
+  }
+
+  const name = /^dr\.?\s/i.test(application.name) ? application.name : `Dr. ${application.name}`;
+  const bioParts = [
+    application.qualification,
+    application.bio,
+    application.registrationNo && `Medical Council Reg. No. ${application.registrationNo}.`,
+  ].filter(Boolean);
+
+  const doctor = {
+    id: 'doc-' + Date.now(),
+    name,
+    specialty: application.specialty,
+    department: application.department || application.specialty,
+    image: '',
+    rating: 0,
+    hospital: application.hospital,
+    addressLine: application.addressLine,
+    area: application.area,
+    landmark: application.landmark,
+    pincode: application.pincode,
+    clinicPhone: application.phone,
+    bio: bioParts.join(' '),
+    videoEnabled: application.videoEnabled !== false,
+    slots: application.slots,
+    maxSchedulesPerSlot: application.maxSchedulesPerSlot || 4,
+    isActive: true,
+    experienceYears: application.experienceYears,
+    state: application.state,
+    district: application.district,
+    onboardedAt: new Date().toISOString(),
+  };
+
+  data.doctors.push(doctor);
+  application.status = 'approved';
+  application.reviewedAt = new Date().toISOString();
+  application.doctorId = doctor.id;
+  saveData(data);
+  res.json({ application, doctor });
+});
+
+app.post('/api/doctor-applications/:id/reject', (req, res) => {
+  const data = loadData();
+  const application = (data.doctorApplications || []).find((a: any) => a.id === req.params.id);
+  if (!application) {
+    return res.status(404).json({ error: 'Application not found' });
+  }
+  if (application.status !== 'pending') {
+    return res.status(400).json({ error: `This application was already ${application.status}.` });
+  }
+  application.status = 'rejected';
+  application.reviewedAt = new Date().toISOString();
+  application.reviewNote = String(req.body?.note || '').slice(0, 300);
+  saveData(data);
+  res.json(application);
+});
+
 // Hospital Config Get & Post
 app.get('/api/hospital/config', (req, res) => {
   const data = loadData();
@@ -1416,7 +1737,8 @@ app.get('/api/hospital/stats', (req, res) => {
   // Revenue means platform fees only. A doctor's consultation fee is collected
   // at the clinic desk, never through this system, so it must not be totalled
   // here — see src/lib/pricing.ts.
-  const totalRevenue = appointments.filter((a: any) => a.feePaid).length * PLATFORM_FEE;
+  // Refunded bookings returned their fee, so they are excluded.
+  const totalRevenue = appointments.filter((a: any) => a.feePaid && !a.refundStatus).length * PLATFORM_FEE;
   const activeDoctors = doctors.length;
   const totalPatients = patients.length;
   const completedConsultations = appointments.filter((a: any) => a.status === 'completed').length;
@@ -1441,10 +1763,25 @@ app.post('/api/appointments/:id/pay', (req, res) => {
     return res.status(404).json({ error: 'Appointment not found' });
   }
 
+  if (appt.status === 'cancelled') {
+    return res.status(400).json({ error: 'This appointment was cancelled — there is nothing to pay.' });
+  }
+  if (appt.feePaid) {
+    return res.json(appt);
+  }
+
+  // Only the ₹50 platform fee is ever collected through the app; the amount
+  // the client sends is ignored. `feePaid` is what every screen reads — the
+  // endpoint used to set an unused `paymentStatus`, so a paid booking kept
+  // showing as UNPAID.
+  void amountPaid;
+  appt.feePaid = true;
   appt.paymentStatus = 'paid';
-  appt.amountPaid = Number(amountPaid) || appt.invoiceAmount || 150;
-  appt.paymentMethod = paymentMethod || 'Credit Card';
-  appt.paidAt = new Date().toISOString();
+  appt.amountPaid = PLATFORM_FEE;
+  appt.totalAmount = PLATFORM_FEE;
+  appt.paymentMethod = paymentMethod || 'UPI';
+  appt.paymentDate = new Date().toISOString();
+  appt.paidAt = appt.paymentDate;
 
   saveData(data);
   res.json(appt);
@@ -1461,8 +1798,17 @@ app.post('/api/appointments/:id/feedback', (req, res) => {
     return res.status(404).json({ error: 'Appointment not found' });
   }
 
-  appt.rating = Number(rating) || 5;
-  appt.feedbackText = text || '';
+  if (appt.status !== 'completed') {
+    return res.status(400).json({ error: 'You can rate a visit once the consultation is completed.' });
+  }
+
+  // `feedbackRating` is the field every screen reads (the doctor dashboard's
+  // average, the history card's "Rated 4★"); this used to write `rating`, so
+  // feedback was saved but never shown anywhere.
+  const stars = Math.min(5, Math.max(1, Math.round(Number(rating) || 5)));
+  appt.feedbackRating = stars;
+  appt.feedbackText = String(text || '').slice(0, 1000);
+  appt.feedbackAt = new Date().toISOString();
 
   saveData(data);
   res.json(appt);
@@ -1480,7 +1826,7 @@ app.post('/api/system/reset', (req, res) => {
         age: 34,
         gender: 'Male',
         contact: '+91 98201 45678',
-        abhaNumber: '91-2345-6789-0123',
+        abhaId: '91-2345-6789-0123',
         city: 'Mumbai',
         allergies: ['Penicillin', 'Dust Mites'],
         medications: ['Telmisartan 40mg (Morning)'],
@@ -1494,7 +1840,7 @@ app.post('/api/system/reset', (req, res) => {
         age: 62,
         gender: 'Male',
         contact: '+91 94140 88210',
-        abhaNumber: '91-5678-1234-9876',
+        abhaId: '91-5678-1234-9876',
         city: 'Bengaluru',
         allergies: ['Sulfa Drugs'],
         medications: ['Metformin 500mg (Post Lunch)', 'Atorvastatin 10mg (Night)'],
@@ -1508,7 +1854,7 @@ app.post('/api/system/reset', (req, res) => {
         age: 10,
         gender: 'Female',
         contact: '+91 97112 33445',
-        abhaNumber: '91-9988-7766-5544',
+        abhaId: '91-9988-7766-5544',
         city: 'Chennai',
         allergies: ['Peanuts', 'Pollen'],
         medications: ['Asthalin Inhaler (SOS)'],
@@ -1522,7 +1868,7 @@ app.post('/api/system/reset', (req, res) => {
         age: 29,
         gender: 'Female',
         contact: '+91 99580 12345',
-        abhaNumber: '91-4433-2211-0099',
+        abhaId: '91-4433-2211-0099',
         city: 'New Delhi',
         allergies: ['None'],
         medications: ['Multivitamins', 'Vitamin D3 60k IU'],
@@ -1638,7 +1984,7 @@ app.post('/api/system/reset', (req, res) => {
         invoiceAmount: 1200,
         feePaid: true,
         paymentMethod: 'UPI / GPay',
-        amountPaid: 1200,
+        amountPaid: 50,
       },
       {
         id: 'appt-203',
@@ -1672,7 +2018,7 @@ app.post('/api/system/reset', (req, res) => {
         invoiceAmount: 900,
         feePaid: true,
         paymentMethod: 'Paytm UPI',
-        amountPaid: 900,
+        amountPaid: 50,
       },
     ],
     hospitalConfig: DEFAULT_HOSPITAL_CONFIG,

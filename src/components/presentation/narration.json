@@ -1,0 +1,92 @@
+[
+  {
+    "id": "s01",
+    "en": "Doctor, this is neXgen Healthcare — the simplest way to fill your OPD with confirmed patients, while every rupee of your consultation fee stays with you.",
+    "tts": "Doctor, this is Nexgen Healthcare. The simplest way to fill your O P D with confirmed patients, while every rupee of your consultation fee stays with you.",
+    "hi": "डॉक्टर साहब, यह है neXgen Healthcare — आपकी OPD को पक्के मरीज़ों से भरने का सबसे आसान तरीका, और आपकी परामर्श फीस का हर रुपया आपके पास ही रहता है।"
+  },
+  {
+    "id": "s02",
+    "en": "Today, most clinics run on crowds and guesswork. Patients queue from early morning, some never turn up, and many who searched for a doctor like you simply never found you.",
+    "tts": "Today, most clinics run on crowds and guesswork. Patients queue from early morning, some never turn up, and many who searched for a doctor like you, simply never found you.",
+    "hi": "आज ज़्यादातर क्लिनिक भीड़ और अंदाज़े पर चलते हैं। मरीज़ सुबह से कतार में लगते हैं, कुछ आते ही नहीं, और आप जैसे डॉक्टर को खोजने वाले कई मरीज़ आप तक पहुँच ही नहीं पाते।"
+  },
+  {
+    "id": "s03",
+    "en": "neXgen changes that. Patients find you online, choose a time, and confirm their seat by paying a small ₹50 booking fee to the platform.",
+    "tts": "Nexgen changes that. Patients find you online, choose a time, and confirm their seat by paying a small, fifty rupee booking fee to the platform.",
+    "hi": "neXgen इसे बदलता है। मरीज़ आपको ऑनलाइन खोजते हैं, समय चुनते हैं, और प्लेटफ़ॉर्म को सिर्फ़ ₹50 की बुकिंग फीस देकर अपनी सीट पक्की करते हैं।"
+  },
+  {
+    "id": "s04",
+    "en": "Your consultation fee is never touched. Patients pay you at the clinic, exactly as they do today. No commission. No settlement delays. And joining is free.",
+    "tts": "Your consultation fee is never touched. Patients pay you at the clinic, exactly as they do today. No commission. No settlement delays. And joining is free.",
+    "hi": "आपकी परामर्श फीस को कोई हाथ नहीं लगाता। मरीज़ पहले की तरह क्लिनिक पर ही आपको फीस देते हैं। कोई कमीशन नहीं। पैसे के लिए कोई इंतज़ार नहीं। और जुड़ना बिल्कुल मुफ़्त है।"
+  },
+  {
+    "id": "s05",
+    "en": "Every patient in your district who searches by speciality, symptom or locality sees your profile — your photo, experience, ratings, your chamber on the map, and your next free slot.",
+    "tts": "Every patient in your district who searches by speciality, symptom, or locality, sees your profile. Your photo, experience, ratings, your chamber on the map, and your next free slot.",
+    "hi": "आपके ज़िले में विशेषज्ञता, लक्षण या इलाके से खोजने वाला हर मरीज़ आपकी प्रोफ़ाइल देखता है — आपकी फ़ोटो, अनुभव, रेटिंग, नक्शे पर आपका चैंबर, और आपका अगला खाली समय।"
+  },
+  {
+    "id": "s06",
+    "en": "Because patients have paid to confirm, they show up. Reminders on WhatsApp and SMS bring them in on time, and free rescheduling means a busy patient moves the visit instead of skipping it.",
+    "tts": "Because patients have paid to confirm, they show up. Reminders on WhatsApp and S M S bring them in on time. And free rescheduling means a busy patient moves the visit, instead of skipping it.",
+    "hi": "मरीज़ों ने पैसे देकर बुकिंग पक्की की है, इसलिए वे आते हैं। WhatsApp और SMS रिमाइंडर उन्हें समय पर लाते हैं, और मुफ़्त रीशेड्यूल से व्यस्त मरीज़ विज़िट छोड़ने के बजाय उसका समय बदल लेता है।"
+  },
+  {
+    "id": "s07",
+    "en": "When someone cancels, the waitlist alerts the next patient instantly — so the seat is filled again instead of going empty.",
+    "tts": "When someone cancels, the waitlist alerts the next patient instantly. So the seat is filled again, instead of going empty.",
+    "hi": "जब कोई रद्द करता है, वेटलिस्ट तुरंत अगले मरीज़ को सूचना देती है — ताकि सीट खाली जाने के बजाय फिर से भर जाए।"
+  },
+  {
+    "id": "s08",
+    "en": "Your OPD runs on tokens. Every booking gets a token number in order, each slot has a limit you set, and your desk sees the live queue — no crowd at the door, and more time for each patient.",
+    "tts": "Your O P D runs on tokens. Every booking gets a token number in order, each slot has a limit you set, and your desk sees the live queue. No crowd at the door, and more time for each patient.",
+    "hi": "आपकी OPD टोकन से चलती है। हर बुकिंग को क्रम से टोकन नंबर मिलता है, हर स्लॉट की सीमा आप तय करते हैं, और आपकी डेस्क लाइव कतार देखती है — दरवाज़े पर भीड़ नहीं, और हर मरीज़ के लिए ज़्यादा समय।"
+  },
+  {
+    "id": "s09",
+    "en": "Turn on video consultations for follow-ups and patients from far away. See them from your clinic or from home, in the evening — without adding a single chair.",
+    "tts": "Turn on video consultations, for follow ups, and patients from far away. See them from your clinic or from home, in the evening, without adding a single chair.",
+    "hi": "फ़ॉलो-अप और दूर के मरीज़ों के लिए वीडियो परामर्श चालू करें। उन्हें क्लिनिक से या घर से, शाम को भी देखें — बिना एक भी कुर्सी बढ़ाए।"
+  },
+  {
+    "id": "s10",
+    "en": "Your digital prescription reaches the patient's health vault instantly. Their history is ready at the next visit, and they can book you again in one tap.",
+    "tts": "Your digital prescription reaches the patient's health vault instantly. Their history is ready at the next visit, and they can book you again, in one tap.",
+    "hi": "आपका डिजिटल पर्चा तुरंत मरीज़ के हेल्थ वॉल्ट में पहुँच जाता है। अगली विज़िट पर उनका पूरा इतिहास तैयार रहता है, और वे एक टैप में आपको फिर से बुक कर सकते हैं।"
+  },
+  {
+    "id": "s11",
+    "en": "After each visit, patients can rate you — building trust with new patients. And if you are running late, your desk can inform every booked patient in one click.",
+    "tts": "After each visit, patients can rate you, building trust with new patients. And if you are running late, your desk can inform every booked patient, in one click.",
+    "hi": "हर विज़िट के बाद मरीज़ आपको रेटिंग दे सकते हैं — जिससे नए मरीज़ों का भरोसा बढ़ता है। और अगर आपको देर हो रही है, तो आपकी डेस्क एक क्लिक में सभी बुक मरीज़ों को सूचना दे सकती है।"
+  },
+  {
+    "id": "s12",
+    "en": "Practise at more than one chamber? Each gets its own address, map and timings. Your dashboard shows today's bookings, chamber load, follow-ups and ratings at a glance.",
+    "tts": "Practise at more than one chamber? Each one gets its own address, map, and timings. Your dashboard shows today's bookings, chamber load, follow ups, and ratings, at a glance.",
+    "hi": "एक से ज़्यादा चैंबर में बैठते हैं? हर चैंबर का अपना पता, नक्शा और समय होता है। आपका डैशबोर्ड आज की बुकिंग, चैंबर की भीड़, फ़ॉलो-अप और रेटिंग एक नज़र में दिखाता है।"
+  },
+  {
+    "id": "s13",
+    "en": "A simple illustration: if your fee is ₹400 and neXgen brings you just four more patients a day, that is ₹1,600 more per day — about ₹41,600 a month over 26 OPD days. Your numbers will vary, but every extra fee is 100% yours.",
+    "tts": "Here is a simple illustration. If your fee is four hundred rupees, and Nexgen brings you just four more patients a day, that is sixteen hundred rupees more per day. About forty one thousand, six hundred rupees a month, over twenty six O P D days. Your numbers will vary, but every extra fee is one hundred percent yours.",
+    "hi": "एक सरल उदाहरण: अगर आपकी फीस ₹400 है और neXgen आपको रोज़ सिर्फ़ चार अतिरिक्त मरीज़ देता है, तो यह रोज़ ₹1,600 ज़्यादा है — 26 OPD दिनों में महीने के लगभग ₹41,600। आपके आँकड़े अलग हो सकते हैं, पर हर अतिरिक्त फीस 100% आपकी है।"
+  },
+  {
+    "id": "s14",
+    "en": "Joining takes three steps. Apply on our website with your registration number and chamber details. Our team verifies you. Your profile goes live, and patients start booking.",
+    "tts": "Joining takes three steps. Apply on our website, with your registration number and chamber details. Our team verifies you. Your profile goes live, and patients start booking.",
+    "hi": "जुड़ने के तीन कदम हैं। हमारी वेबसाइट पर अपने रजिस्ट्रेशन नंबर और चैंबर की जानकारी के साथ आवेदन करें। हमारी टीम सत्यापन करती है। आपकी प्रोफ़ाइल लाइव होती है, और मरीज़ बुकिंग शुरू कर देते हैं।"
+  },
+  {
+    "id": "s15",
+    "en": "neXgen Healthcare. More patients, a calmer OPD, and 100% of your fee. Join free today.",
+    "tts": "Nexgen Healthcare. More patients, a calmer O P D, and one hundred percent of your fee. Join free, today.",
+    "hi": "neXgen Healthcare. ज़्यादा मरीज़, शांत OPD, और आपकी पूरी 100% फीस। आज ही मुफ़्त जुड़ें।"
+  }
+]

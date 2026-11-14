@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   MapPin,
   Video,
@@ -48,6 +48,7 @@ import { doctorDirectoryConfig, patientPortalConfig } from '../config';
 import { buildDirectionsLink, formatFullAddress } from '../lib/location';
 import { PLATFORM_FEE, DOCTOR_FEE_NOTE } from '../lib/pricing';
 import { isFutureAppointment, todayLocal } from '../lib/appointments';
+import { usePreferences } from '../lib/preferences';
 
 interface DoctorBookingProps {
   doctors: Doctor[];
@@ -67,6 +68,22 @@ interface DoctorBookingProps {
    * Omitted by the front-desk/admin screens, which always keep the picker.
    */
   currentUser?: LoggedInUser | null;
+  /** Open straight on step 2 with this doctor chosen (from a doctor card elsewhere). */
+  preselectedDoctorId?: string;
+  /** Prefill the directory search (e.g. a query typed on the home page). */
+  initialSearch?: string;
+  /** Prefill the department filter (e.g. a speciality tile). */
+  initialDepartment?: string;
+  /**
+   * Reschedule mode: move `initialAppointment` to the newly picked slot rather
+   * than creating a second booking. The ₹50 already paid carries over.
+   */
+  onRescheduleAppointment?: (
+    appointmentId: string,
+    data: { date: string; timeSlot: string; type: 'visiting' | 'video' }
+  ) => Promise<any>;
+  /** Shown on the confirmation screen: jump to the patient's appointment list. */
+  onViewAppointments?: () => void;
   onBookAppointment: (bookingData: {
     doctorId: string;
     patientId: string;
@@ -87,6 +104,7 @@ interface DoctorBookingProps {
     taxAmount?: number;
     totalAmount?: number;
     bookingNo?: string;
+    bookedByRole?: string;
   }) => Promise<any>;
 }
 
@@ -98,32 +116,53 @@ interface UploadedDoc {
 }
 
 /** "Wed, 5 Aug" — friendlier than an ISO string for a patient reading a summary. */
-function friendlyDate(iso: string): string {
+function friendlyDate(iso: string, lang: 'en' | 'hi' = 'en'): string {
   if (!iso) return '';
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  return d.toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
 export default function DoctorBooking({
-  doctors,
+  doctors: allDoctors,
   patients,
   onBookAppointment,
   initialAppointment,
   onCloseModal,
   requireSearch: requireSearchProp,
   currentUser,
+  preselectedDoctorId,
+  initialSearch,
+  initialDepartment,
+  onRescheduleAppointment,
+  onViewAppointments,
 }: DoctorBookingProps) {
+  /**
+   * Only doctors taking bookings are offered. An inactive doctor used to appear
+   * in search and could be picked, only for the booking to fail at payment. A
+   * reschedule keeps its own doctor even if they have since been paused, so
+   * the summary can still render.
+   */
+  const doctors = useMemo(
+    () =>
+      allDoctors.filter(
+        d => d.isActive !== false || d.id === initialAppointment?.doctorId || d.id === preselectedDoctorId
+      ),
+    [allDoctors, initialAppointment?.doctorId, preselectedDoctorId]
+  );
+  const isReschedule = Boolean(initialAppointment && onRescheduleAppointment);
+  const { t, lang } = usePreferences();
+
   // Three required steps, then the confirmation screen.
   // 1: Choose doctor  2: Pick time + patient  3: Review & pay  4: Booked
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [currentStep, setCurrentStep] = useState<number>(preselectedDoctorId ? 2 : 1);
 
   // Filter State for Step 1
   const [filterState, setFilterState] = useState<DoctorFilterState>({
     state: 'ALL',
     district: 'ALL',
-    searchName: '',
-    department: 'ALL',
+    searchName: initialSearch || '',
+    department: initialDepartment || 'ALL',
     availability: 'ALL'
   });
 
@@ -164,7 +203,7 @@ export default function DoctorBooking({
   }, [doctors]);
 
   const [selectedDocId, setSelectedDocId] = useState<string>(
-    requireSearch ? '' : doctors[0]?.id || ''
+    preselectedDoctorId || (requireSearch ? '' : doctors[0]?.id || '')
   );
 
   // Auto-switch the selection only when the whole list is on show. Behind a
@@ -265,6 +304,8 @@ export default function DoctorBooking({
   const [isWaitlistSubmitting, setIsWaitlistSubmitting] = useState<boolean>(false);
   const [waitlistSuccess, setWaitlistSuccess] = useState<{ slot: string; date: string; message: string } | null>(null);
   const [activeNotification, setActiveNotification] = useState<InAppNotification | null>(null);
+  /** A slot to keep selected across the next doctor/date change (waitlist claim). */
+  const pendingSlotRef = useRef<string>('');
 
   const selectedDoctor = doctors.find((d) => d.id === selectedDocId);
   // Present only for a saved profile — a brand new patient is typed in by hand,
@@ -301,7 +342,9 @@ export default function DoctorBooking({
    */
   const missingPatientDetailsMessage = () =>
     lockedPatient
-      ? 'Your profile is missing a name, age or mobile number. Please complete your profile before booking.'
+      ? !patientAge
+        ? 'Please enter the patient’s age in the Patient section.'
+        : 'Your profile is missing a name or mobile number. Please complete your profile before booking.'
       : 'Please fill in the patient name, age and mobile number.';
 
   // Fetch waitlist & notifications
@@ -316,9 +359,16 @@ export default function DoctorBooking({
         setWaitlistEntries(wl);
       }
       if (notifRes.ok) {
-        const notifs = await notifRes.json();
-        setInAppNotifications(notifs);
-        const unreadAlert = notifs.find((n: InAppNotification) => n.type === 'slot_available' && !n.read);
+        const notifs: InAppNotification[] = await notifRes.json();
+        // A slot alert belongs to the patient who joined the waitlist. It used
+        // to be shown to whoever had the booking page open — every patient saw
+        // every other patient's "a slot just opened" banner.
+        const mine =
+          currentUser?.role === 'patient'
+            ? notifs.filter(n => n.patientId === currentUser.id)
+            : [];
+        setInAppNotifications(mine);
+        const unreadAlert = mine.find(n => n.type === 'slot_available' && !n.read);
         setActiveNotification(unreadAlert || null);
       }
     } catch (err) {
@@ -401,9 +451,13 @@ export default function DoctorBooking({
     } catch (err) {
       console.error(err);
     }
+    // Changing doctor/date re-runs the slot loader, which clears the selected
+    // slot — so the claimed slot is parked here and re-applied once it loads.
+    pendingSlotRef.current = notif.timeSlot;
     setSelectedDocId(notif.doctorId);
     setSelectedDate(notif.date);
     setSelectedSlot(notif.timeSlot);
+    setCurrentStep(2);
     setActiveNotification(null);
     setWaitlistSuccess(null);
     try {
@@ -438,16 +492,17 @@ export default function DoctorBooking({
   const taxAmount = 0;
   const totalAmount = bookingFee;
 
-  // Next 7 days for the date picker
-  const datesList = Array.from({ length: 7 }).map((_, i) => {
+  // Next 14 days for the date picker — a week was too short for specialists
+  // whose next free OPD is often ten days out.
+  const datesList = Array.from({ length: 14 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     const dateStr = `${yyyy}-${mm}-${dd}`;
-    const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
-    const month = d.toLocaleDateString('en-US', { month: 'short' });
+    const weekday = d.toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'short' });
+    const month = d.toLocaleDateString(lang === 'hi' ? 'hi-IN' : 'en-US', { month: 'short' });
     const dayNum = d.getDate();
     return { dateStr, weekday, dayNum, month };
   });
@@ -474,7 +529,8 @@ export default function DoctorBooking({
     };
 
     fetchSlotsTracker();
-    setSelectedSlot('');
+    setSelectedSlot(pendingSlotRef.current || '');
+    pendingSlotRef.current = '';
   }, [selectedDocId, selectedDate, bookingSuccess]);
 
   // Adjust apptType to visiting if doctor doesn't support video
@@ -559,10 +615,32 @@ export default function DoctorBooking({
     }
 
     setIsSubmitting(true);
-    try {
-      const generatedBookingNo = `BK-NXG-${Math.floor(100000 + Math.random() * 900000)}`;
-      const generatedTokenNo = `Token #A-${Math.floor(10 + Math.random() * 89)}`;
 
+    // Reschedule: move the existing booking. No new fee, no second seat.
+    if (isReschedule && initialAppointment && onRescheduleAppointment) {
+      try {
+        const result = await onRescheduleAppointment(initialAppointment.id, {
+          date: selectedDate,
+          timeSlot: selectedSlot,
+          type: apptType,
+        });
+        if (result && !result.error) {
+          setBookingSuccess(result);
+          setCurrentStep(4);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          setErrorMessage(result?.error || 'We could not move this booking. Please try another time.');
+        }
+      } catch (err: any) {
+        setErrorMessage(err.message || 'Something went wrong while rescheduling. Please try again.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    try {
+      // Booking number and OPD token are issued by the server.
       const bookingPayload = {
         doctorId: selectedDocId,
         patientId: selectedPatientId === 'new' ? '' : selectedPatientId,
@@ -582,8 +660,7 @@ export default function DoctorBooking({
         discountAmount,
         taxAmount,
         totalAmount,
-        bookingNo: generatedBookingNo,
-        tokenNo: generatedTokenNo
+        bookedByRole: currentUser?.role,
       };
 
       const result = await onBookAppointment(bookingPayload);
@@ -627,6 +704,13 @@ export default function DoctorBooking({
       setErrorMessage('Please choose a time for the appointment.');
       return;
     }
+    // A full slot can be selected (that is how the waitlist is offered), but it
+    // must not be carried on to payment — the server would refuse it there,
+    // after the patient had already filled in everything.
+    if (isSelectedSlotFull) {
+      setErrorMessage(`${selectedSlot} is fully booked. Please pick another time, or join the waitlist for it.`);
+      return;
+    }
     if (!patientName || !patientAge || !patientContact) {
       setErrorMessage(missingPatientDetailsMessage());
       return;
@@ -636,9 +720,9 @@ export default function DoctorBooking({
   };
 
   const STEPS = [
-    { id: 1, title: 'Doctor' },
-    { id: 2, title: 'Date & time' },
-    { id: 3, title: 'Confirm' },
+    { id: 1, title: t('book.step.doctor') },
+    { id: 2, title: t('book.step.datetime') },
+    { id: 3, title: t('book.step.confirm') },
   ];
 
   const extrasCount =
@@ -672,27 +756,38 @@ export default function DoctorBooking({
       {/* ---------------------------------------------------------------- */}
       {/* Page heading                                                      */}
       {/* ---------------------------------------------------------------- */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="font-serif text-2xl font-semibold tracking-tight text-slate-900">
-            {initialAppointment ? 'Reschedule appointment' : 'Book an appointment'}
-          </h2>
-          <p className="text-sm text-slate-500">
-            {initialAppointment
-              ? `Choose a new date and time for booking #${previousBookingId}`
-              : 'Three quick steps. Pay ₹50 now to hold your slot — the doctor’s fee is paid at the clinic.'}
-          </p>
-        </div>
+      <div className="bg-brand relative overflow-hidden rounded-2xl p-5 text-white shadow-lift sm:p-6">
+        <div className="bg-crosses absolute inset-0 opacity-70" />
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1.5">
+            <h2 className="text-2xl font-extrabold tracking-tight">
+              {initialAppointment ? t('book.titleRes') : t('book.title')}
+            </h2>
+            <p className="max-w-xl text-sm text-white/85">
+              {initialAppointment ? t('book.subRes', { no: initialAppointment.bookingNo || '' }) : t('book.sub')}
+            </p>
+          </div>
 
-        {onCloseModal && (
-          <button
-            type="button"
-            onClick={onCloseModal}
-            className="cursor-pointer rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
-            title="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {onCloseModal && (
+            <button
+              type="button"
+              onClick={onCloseModal}
+              className="cursor-pointer rounded-lg bg-white/15 p-2 text-white transition-colors hover:bg-white/25"
+              title="Close"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+        {!initialAppointment && (
+          <div className="relative mt-4 flex flex-wrap gap-2">
+            {[t('book.chip1'), t('book.chip2'), t('book.chip3')].map(chip => (
+              <span key={chip} className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[12px] font-semibold backdrop-blur">
+                <Check className="h-3.5 w-3.5" /> {chip}
+              </span>
+            ))}
+          </div>
         )}
       </div>
 
@@ -807,10 +902,10 @@ export default function DoctorBooking({
           <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
             <div>
               {/* <h3 className="text-base font-semibold text-slate-900">Who would you like to see?</h3> */}
-              <h3 className="text-base font-semibold text-slate-900">Search Doctor</h3>
+              <h3 className="text-base font-semibold text-slate-900">{t('book.search.title')}</h3>
               <p className="text-sm text-slate-500">
                 {requireSearch
-                  ? 'Search by name, speciality, hospital or locality — matching doctors appear below.'
+                  ? t('book.search.hint')
                   : 'Search by name or condition, or browse by department.'}
               </p>
             </div>
@@ -822,7 +917,7 @@ export default function DoctorBooking({
                   type="search"
                   value={filterState.searchName}
                   onChange={(e) => setFilterState(p => ({ ...p, searchName: e.target.value }))}
-                  placeholder="Search a doctor, speciality or hospital"
+                  placeholder={t('book.search.ph')}
                   aria-label="Search doctors"
                   className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition-colors focus:border-indigo-500"
                 />
@@ -834,7 +929,7 @@ export default function DoctorBooking({
                 aria-label="Department"
                 className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition-colors focus:border-indigo-500"
               >
-                <option value="ALL">All departments</option>
+                <option value="ALL">{t('book.allDepts')}</option>
                 {departments.map(dept => (
                   <option key={dept} value={dept}>{dept}</option>
                 ))}
@@ -845,7 +940,7 @@ export default function DoctorBooking({
             <details className="group">
               <summary className="-my-1 inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 py-2 text-sm font-medium text-indigo-700 hover:text-indigo-800">
                 <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-                More filters
+                {t('book.moreFilters')}
               </summary>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <select
@@ -898,7 +993,7 @@ export default function DoctorBooking({
               </span>
 
               <div className="space-y-1.5">
-                <p className="text-base font-semibold text-slate-900">Search to see doctors</p>
+                <p className="text-base font-semibold text-slate-900">{t('book.searchToSee')}</p>
                 <p className="mx-auto max-w-md text-sm text-slate-500">
                   {typedQuery && !hasTypedQuery ? (
                     <>
@@ -919,7 +1014,7 @@ export default function DoctorBooking({
               {doctorDirectoryConfig.revealOnFilter && departments.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                    Or browse a department
+                    {t('book.browseDept')}
                   </p>
                   <div className="flex flex-wrap justify-center gap-2">
                     {departments.slice(0, 8).map(dept => (
@@ -953,15 +1048,15 @@ export default function DoctorBooking({
                     onClick={() => setFilterState({ state: 'ALL', district: 'ALL', searchName: '', department: 'ALL', availability: 'ALL' })}
                     className="cursor-pointer text-sm font-medium text-indigo-700 hover:text-indigo-800"
                   >
-                    Clear search
+                    {t('book.clear')}
                   </button>
                 )}
               </div>
 
               {matchingDoctors.length === 0 ? (
                 <div className="space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-                  <p className="text-sm font-medium text-slate-800">No doctors match that search</p>
-                  <p className="text-sm text-slate-500">Try a different name, speciality or locality.</p>
+                  <p className="text-sm font-medium text-slate-800">{t('book.noMatch')}</p>
+                  <p className="text-sm text-slate-500">{t('book.noMatchHint')}</p>
                   <button
                     type="button"
                     onClick={() => setFilterState({ state: 'ALL', district: 'ALL', searchName: '', department: 'ALL', availability: 'ALL' })}
@@ -1030,11 +1125,11 @@ export default function DoctorBooking({
                                     patient flow — it is settled in person at the
                                     clinic, so a figure here would be a promise
                                     the reception desk has to honour. */}
-                                <span className="text-slate-500">Fee paid at the clinic</span>
+                                <span className="text-slate-500">{t('book.feeAtClinic')}</span>
                                 {doc.videoEnabled && (
                                   <span className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600">
                                     <Video className="h-3 w-3" />
-                                    Video available
+                                    {t('book.videoAvail')}
                                   </span>
                                 )}
                               </div>
@@ -1068,7 +1163,7 @@ export default function DoctorBooking({
             summary={
               selectedDoctor ? (
                 <span className="text-sm text-slate-600">
-                  Selected: <strong className="font-semibold text-slate-900">{selectedDoctor.name}</strong>
+                  {t('book.selected')} <strong className="font-semibold text-slate-900">{selectedDoctor.name}</strong>
                   {(selectedDoctor.area || selectedDoctor.district) && (
                     <span className="text-slate-500">
                       {' '}· {selectedDoctor.area || selectedDoctor.district}
@@ -1077,7 +1172,7 @@ export default function DoctorBooking({
                 </span>
               ) : null
             }
-            next={{ label: 'Continue', onClick: goToStep2, disabled: !selectedDocId }}
+            next={{ label: t('common.continue'), onClick: goToStep2, disabled: !selectedDocId }}
           />
         </div>
       )}
@@ -1104,7 +1199,7 @@ export default function DoctorBooking({
                 onClick={() => setCurrentStep(1)}
                 className="shrink-0 cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
               >
-                Change
+                {t('book.change')}
               </button>
             </div>
 
@@ -1116,7 +1211,7 @@ export default function DoctorBooking({
 
           {/* How to consult */}
           <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
-            <h3 className="text-base font-semibold text-slate-900">How would you like to consult?</h3>
+            <h3 className="text-base font-semibold text-slate-900">{t('book.howConsult')}</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
@@ -1130,8 +1225,8 @@ export default function DoctorBooking({
               >
                 <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
                 <span>
-                  <span className="block font-medium text-slate-900">Visit the hospital</span>
-                  <span className="block text-sm text-slate-500">Meet the doctor in the OPD</span>
+                  <span className="block font-medium text-slate-900">{t('book.visit')}</span>
+                  <span className="block text-sm text-slate-500">{t('book.visitD')}</span>
                 </span>
               </button>
 
@@ -1150,9 +1245,9 @@ export default function DoctorBooking({
               >
                 <Video className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
                 <span>
-                  <span className="block font-medium text-slate-900">Video call</span>
+                  <span className="block font-medium text-slate-900">{t('book.videoCall')}</span>
                   <span className="block text-sm text-slate-500">
-                    {selectedDoctor.videoEnabled ? 'Consult from home' : 'Not offered by this doctor'}
+                    {selectedDoctor.videoEnabled ? t('book.videoD') : t('book.videoNo')}
                   </span>
                 </span>
               </button>
@@ -1161,8 +1256,8 @@ export default function DoctorBooking({
 
           {/* Date */}
           <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
-            <h3 className="text-base font-semibold text-slate-900">Pick a day</h3>
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+            <h3 className="text-base font-semibold text-slate-900">{t('book.pickDay')}</h3>
+            <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-2">
               {datesList.map((item, idx) => {
                 const isSelected = selectedDate === item.dateStr;
                 return (
@@ -1171,14 +1266,14 @@ export default function DoctorBooking({
                     type="button"
                     onClick={() => setSelectedDate(item.dateStr)}
                     aria-pressed={isSelected}
-                    className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border py-3 transition-colors ${
+                    className={`flex w-[72px] shrink-0 snap-start cursor-pointer flex-col items-center justify-center rounded-xl border py-3 transition-colors ${
                       isSelected
                         ? 'border-indigo-600 bg-indigo-600 text-white'
                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                     }`}
                   >
                     <span className={`text-[11px] uppercase ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>
-                      {idx === 0 ? 'Today' : idx === 1 ? 'Tomorrow' : item.weekday}
+                      {idx === 0 ? t('common.today') : idx === 1 ? t('common.tomorrow') : item.weekday}
                     </span>
                     <span className="font-mono text-lg font-semibold leading-tight">{item.dayNum}</span>
                     <span className={`text-[11px] ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>
@@ -1193,12 +1288,12 @@ export default function DoctorBooking({
           {/* Time */}
           <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-base font-semibold text-slate-900">Pick a time</h3>
-              <span className="text-sm text-slate-500">{friendlyDate(selectedDate)}</span>
+              <h3 className="text-base font-semibold text-slate-900">{t('book.pickTime')}</h3>
+              <span className="text-sm text-slate-500">{friendlyDate(selectedDate, lang)}</span>
             </div>
 
             {isLoadingSlots ? (
-              <p className="py-6 text-center text-sm text-slate-400">Checking availability…</p>
+              <p className="py-6 text-center text-sm text-slate-400">{t('book.checking')}</p>
             ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -1248,7 +1343,7 @@ export default function DoctorBooking({
                               : 'text-emerald-700'
                           }`}
                         >
-                          {hasPassed ? 'Passed' : isFull ? 'Full' : `${left} left`}
+                          {hasPassed ? t('book.passed') : isFull ? t('book.full') : t('book.left', { n: left })}
                         </span>
                       </button>
                     );
@@ -1311,27 +1406,49 @@ export default function DoctorBooking({
               fields give way to a read-only confirmation of who is booking.
               Front desk and admin never hit this branch — `currentUser` is not
               passed to their booking screens — so they keep the full picker. */}
-          {lockedPatient ? (
+          {/* A reschedule moves an existing booking, so its patient is fixed too. */}
+          {lockedPatient || isReschedule ? (
             <section className="rounded-xl border border-slate-200 bg-white p-5">
               {/* <h3 className="text-base font-semibold text-slate-900">Who is this appointment for?</h3> */}
-              <h3 className="text-base font-semibold text-slate-900">Patient</h3>
+              <h3 className="text-base font-semibold text-slate-900">{t('book.patient')}</h3>
               <div className="mt-3 flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-sm font-semibold text-white">
-                  {lockedPatient.name.charAt(0)}
+                  {(patientName || '?').charAt(0)}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">{lockedPatient.name}</p>
+                  <p className="truncate text-sm font-semibold text-slate-900">{patientName}</p>
                   <p className="truncate text-sm text-slate-500">
-                    {lockedPatient.age} yrs · {lockedPatient.gender} · {lockedPatient.contact}
+                    {[patientAge ? `${patientAge} yrs` : '', selectedPatientRecord?.gender, patientContact]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </p>
                 </div>
               </div>
+              {/* A freshly self-registered patient has only a name and mobile on
+                  file. Ask for the age right here rather than turning them away
+                  to their Profile page — the server saves it to the profile. */}
+              {lockedPatient && !lockedPatient.age && (
+                <div className="mt-3 grid gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:grid-cols-[1fr_140px] sm:items-center">
+                  <p className="text-sm text-amber-900">{t('book.agePrompt')}</p>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={120}
+                    aria-label="Patient age"
+                    placeholder="Age in years"
+                    value={patientAge}
+                    onChange={(e) => setPatientAge(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500"
+                  />
+                </div>
+              )}
             </section>
           ) : (
           <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
             <div>
               {/* <h3 className="text-base font-semibold text-slate-900">Who is this appointment for?</h3> */}
-              <h3 className="text-base font-semibold text-slate-900">Patient</h3>
+              <h3 className="text-base font-semibold text-slate-900">{t('book.patient')}</h3>
               <p className="text-sm text-slate-500">Pick a saved profile, or add someone new.</p>
             </div>
 
@@ -1387,7 +1504,7 @@ export default function DoctorBooking({
           )}
 
           <StepBar
-            back={{ label: 'Back', onClick: () => setCurrentStep(1) }}
+            back={{ label: t('common.back'), onClick: () => setCurrentStep(1) }}
             summary={
               selectedSlot ? (
                 <span className="text-sm text-slate-600">
@@ -1395,10 +1512,10 @@ export default function DoctorBooking({
                   <strong className="font-mono font-semibold text-slate-900">{selectedSlot}</strong>
                 </span>
               ) : (
-                <span className="text-sm text-slate-500">Choose a time to continue</span>
+                <span className="text-sm text-slate-500">{t('book.chooseTime')}</span>
               )
             }
-            next={{ label: 'Continue', onClick: goToStep3 }}
+            next={{ label: t('common.continue'), onClick: goToStep3, disabled: !selectedSlot || isSelectedSlotFull }}
           />
         </div>
       )}
@@ -1421,9 +1538,9 @@ export default function DoctorBooking({
                 card rather than reading as one more section heading. */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 bg-indigo-50 p-5">
               <div>
-                <h3 className="text-base font-semibold text-indigo-950">Review your appointment</h3>
+                <h3 className="text-base font-semibold text-indigo-950">{t('book.review')}</h3>
                 <p className="text-sm text-indigo-900/70">
-                  Please check every detail before paying the ₹{PLATFORM_FEE} booking fee.
+                  {isReschedule ? t('book.reviewSubRes') : t('book.reviewSub')}
                 </p>
               </div>
               <button
@@ -1431,7 +1548,7 @@ export default function DoctorBooking({
                 onClick={() => setCurrentStep(2)}
                 className="cursor-pointer rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-900 transition-colors hover:bg-indigo-100"
               >
-                Edit details
+                {t('book.edit')}
               </button>
             </div>
 
@@ -1549,7 +1666,7 @@ export default function DoctorBooking({
             )}
 
             {/* What it costs */}
-            <div className="space-y-2 border-t border-slate-100 bg-slate-50/70 p-5">
+            <div className={`space-y-2 border-t border-slate-100 bg-slate-50/70 p-5 ${isReschedule ? 'hidden' : ''}`}>
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-sm font-medium text-slate-700">Booking fee — payable now</span>
                 <span className="font-mono text-lg font-semibold text-slate-900">₹{PLATFORM_FEE}</span>
@@ -1561,7 +1678,8 @@ export default function DoctorBooking({
             </div>
           </section>
 
-          {/* Optional extras */}
+          {/* Optional extras — not offered on a reschedule, which only moves the slot. */}
+          {!isReschedule && (
           <details className="group rounded-xl border border-slate-200 bg-white">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5">
               <span>
@@ -1687,17 +1805,47 @@ export default function DoctorBooking({
               </div>
             </div>
           </details>
+          )}
+
+          {/* Reschedule: nothing more to pay. */}
+          {isReschedule && initialAppointment && (
+            <section className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-5">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+                  <RefreshCw className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-semibold text-emerald-950">{t('book.noCharge')}</h3>
+                  <p className="text-sm text-emerald-900/80">
+                    Moving from {friendlyDate(initialAppointment.date)} at {initialAppointment.timeSlot} to{' '}
+                    <strong className="font-semibold">{friendlyDate(selectedDate)} at {selectedSlot}</strong>. Your booking
+                    number stays <span className="font-mono">{initialAppointment.bookingNo}</span>
+                    {initialAppointment.feePaid ? ' and the ₹50 you paid carries over.' : '.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleFinalPaymentSubmit}
+                className="w-full cursor-pointer rounded-xl bg-emerald-600 py-3.5 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {isSubmitting ? t('book.moving') : t('book.confirmNew')}
+              </button>
+            </section>
+          )}
 
           {/* Payment */}
+          {!isReschedule && (
           <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
-            <h3 className="text-base font-semibold text-slate-900">How would you like to pay the ₹50?</h3>
+            <h3 className="text-base font-semibold text-slate-900">{t('book.payTitle')}</h3>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {([
-                { id: 'upi', label: 'UPI', icon: QrCode },
-                { id: 'card', label: 'Card', icon: CreditCard },
-                { id: 'netbanking', label: 'Net banking', icon: Building2 },
-                { id: 'counter', label: 'At the counter', icon: Building },
+                { id: 'upi', label: t('book.pay.upi'), icon: QrCode },
+                { id: 'card', label: t('book.pay.card'), icon: CreditCard },
+                { id: 'netbanking', label: t('book.pay.net'), icon: Building2 },
+                { id: 'counter', label: t('book.pay.counter'), icon: Building },
               ] as const).map(opt => {
                 const Icon = opt.icon;
                 return (
@@ -1806,18 +1954,23 @@ export default function DoctorBooking({
               type="button"
               disabled={isSubmitting}
               onClick={handleFinalPaymentSubmit}
-              className="w-full cursor-pointer rounded-lg bg-indigo-600 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
+              className="w-full cursor-pointer rounded-xl bg-coral-500 py-3.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-coral-600 disabled:opacity-60"
             >
-              {isSubmitting ? 'Confirming your slot…' : 'Pay ₹50 and confirm booking'}
+              {isSubmitting
+                ? t('book.confirming')
+                : paymentMethod === 'counter'
+                ? t('book.holdBtn')
+                : t('book.payBtn')}
             </button>
 
             <p className="flex items-center justify-center gap-1.5 text-[13px] text-slate-500">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              Secure payment · Free cancellation up to 2 hours before
+              {t('book.secure')}
             </p>
           </section>
+          )}
 
-          <StepBar back={{ label: 'Back', onClick: () => setCurrentStep(2) }} />
+          <StepBar back={{ label: t('common.back'), onClick: () => setCurrentStep(2) }} />
         </div>
       )}
 
@@ -1831,14 +1984,16 @@ export default function DoctorBooking({
             <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white">
               <Check className="h-6 w-6" />
             </span>
-            <h3 className="font-serif text-xl font-semibold text-emerald-950">Your appointment is booked</h3>
+            <h3 className="font-serif text-xl font-semibold text-emerald-950">
+              {isReschedule ? t('book.moved') : t('book.booked')}
+            </h3>
             <p className="mt-1 text-sm text-emerald-800">
-              {selectedDoctor?.name} · {friendlyDate(bookingSuccess.date)} at {bookingSuccess.timeSlot}
+              {selectedDoctor?.name} · {friendlyDate(bookingSuccess.date, lang)}, {bookingSuccess.timeSlot}
             </p>
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm">
-                <span className="text-slate-500">Booking ID</span>
+                <span className="text-slate-500">{t('book.bookingId')}</span>
                 <span className="font-mono font-semibold text-slate-900">{bookingSuccess.bookingNo}</span>
                 <button
                   type="button"
@@ -1857,14 +2012,16 @@ export default function DoctorBooking({
 
               {bookingSuccess.tokenNo && (
                 <span className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm">
-                  <span className="text-slate-500">Token</span>
-                  <span className="font-mono font-semibold text-slate-900">{bookingSuccess.tokenNo}</span>
+                  <span className="text-slate-500">{t('book.opdToken')}</span>
+                  <span className="font-mono text-base font-bold text-emerald-700">{bookingSuccess.tokenNo}</span>
                 </span>
               )}
             </div>
 
             <p className="mt-4 text-sm text-emerald-800">
-              Please arrive 15 minutes early. The doctor’s fee is paid at the clinic reception.
+              {bookingSuccess.feePaid === false
+                ? 'Your slot is held. Please pay the ₹50 booking fee at the reception with your booking ID — then the doctor’s fee, as usual.'
+                : 'Please arrive 15 minutes early. The doctor’s fee is paid at the clinic reception.'}
             </p>
           </div>
 
@@ -1896,7 +2053,7 @@ export default function DoctorBooking({
             <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">Getting there</h3>
+                  <h3 className="text-base font-semibold text-slate-900">{t('book.gettingThere')}</h3>
                   <p className="text-sm text-slate-500">
                     Reach 15 minutes early and report to the OPD desk with your booking ID.
                   </p>
@@ -1908,7 +2065,7 @@ export default function DoctorBooking({
                   className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                 >
                   <Navigation className="h-4 w-4" />
-                  Get directions
+                  {t('book.getDirections')}
                 </a>
               </div>
 
@@ -2115,16 +2272,15 @@ export default function DoctorBooking({
                 <div className="flex items-center gap-2">
                   <Building2 className="h-5 w-5 text-indigo-700" />
                   <h3 className="font-serif text-base font-semibold text-slate-900">
-                    neXgen Multispecialty Healthcare
+                    neXgen Healthcare
                   </h3>
                 </div>
                 <p className="mt-1 text-[13px] text-slate-500">
-                  Sadar Hospital Road, Zila School Chowk, Line Bazar, Purnea, Bihar — 854301 · GSTIN
-                  10AABCN9102K1Z
+                  Online OPD booking platform · this receipt covers the ₹50 booking fee only
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Tax invoice</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Booking receipt</p>
                 <p className="font-mono text-sm font-medium text-slate-900">INV-{bookingSuccess.bookingNo}</p>
                 <p className="text-[13px] text-slate-500">
                   {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -2177,15 +2333,20 @@ export default function DoctorBooking({
                   <td className="py-2.5 text-right font-mono">₹{taxAmount.toLocaleString('en-IN')}</td>
                 </tr>
                 <tr className="border-t-2 border-slate-200 font-semibold text-slate-900">
-                  <td className="py-2.5">Paid online today</td>
+                  <td className="py-2.5">
+                    {bookingSuccess.feePaid === false ? 'Due at the clinic reception' : 'Paid online'}
+                  </td>
                   <td className="py-2.5 text-right font-mono">₹{totalAmount.toLocaleString('en-IN')}</td>
                 </tr>
               </tbody>
             </table>
 
             <p className="border-t border-slate-200 pt-4 text-[13px] text-slate-500">
-              Paid by {bookingSuccess.paymentMethod || 'UPI'}. Thank you for booking with neXgen Healthcare —
-              please arrive 15 minutes before your slot.
+              {bookingSuccess.feePaid === false
+                ? 'Booking fee not yet paid — please pay at the reception and quote your booking ID.'
+                : `Paid by ${bookingSuccess.paymentMethod || 'UPI'}.`}{' '}
+              Token {bookingSuccess.tokenNo || '—'}. Thank you for booking with neXgen Healthcare — please arrive 15
+              minutes before your slot. The doctor’s consultation fee is paid separately at the clinic.
             </p>
           </div>
 
@@ -2197,8 +2358,19 @@ export default function DoctorBooking({
               className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50"
             >
               <Printer className="h-4 w-4" />
-              Print invoice
+              {t('book.print')}
             </button>
+
+            {onViewAppointments && !onCloseModal && (
+              <button
+                type="button"
+                onClick={onViewAppointments}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-5 py-2.5 text-sm font-semibold text-indigo-800 transition-colors hover:bg-indigo-100"
+              >
+                <CalendarDays className="h-4 w-4" />
+                {t('book.myAppts')}
+              </button>
+            )}
 
             {onCloseModal ? (
               <button
@@ -2216,7 +2388,7 @@ export default function DoctorBooking({
                 className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
               >
                 <Plus className="h-4 w-4" />
-                Book another appointment
+                {t('book.another')}
               </button>
             )}
           </div>

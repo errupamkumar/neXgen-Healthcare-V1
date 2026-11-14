@@ -8,6 +8,7 @@ import {
   Activity,
   Calendar,
   CalendarCheck,
+  CalendarPlus,
   History,
   Users,
   FileText,
@@ -21,6 +22,10 @@ import {
   Stethoscope,
   CheckCircle2,
   MessageSquare,
+  Home,
+  UserPlus,
+  Settings,
+  ArrowLeft,
 } from 'lucide-react';
 import { Doctor, PatientHistory, MedicalDocument, Appointment, LoggedInUser, DeskMessage } from './types';
 import { buildPrescriptionText } from './lib/prescription';
@@ -36,9 +41,17 @@ import TelehealthCabin from './components/TelehealthCabin';
 import PersonaConsole from './components/PersonaConsole';
 import MessageCenter, { SendMessagePayload } from './components/MessageCenter';
 import Login from './components/Login';
+import Logo, { LogoMark, ROLE_THEME } from './components/brand/Logo';
+import LandingPage from './components/public/LandingPage';
+import PatientHome, { BookIntent } from './components/patient/PatientHome';
+import MyAppointments from './components/patient/MyAppointments';
+import DoctorApplications from './components/admin/DoctorApplications';
+import { PreferenceToggles, usePreferences, useT } from './lib/preferences';
+import type { StringKey } from './i18n/strings';
 
 type Role = LoggedInUser['role'];
 type TabId =
+  | 'home'
   | 'portal'
   | 'upcoming'
   | 'appt-history'
@@ -49,19 +62,30 @@ type TabId =
   | 'patients'
   | 'documents'
   | 'messages'
-  | 'telehealth';
+  | 'telehealth'
+  | 'onboarding';
 
 interface NavItem {
   id: TabId;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  labelKey: StringKey;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   /** Which roles may see this destination. Omitted = everyone. */
   visibleTo?: Role[];
+  /** Same destination, a clearer name for one role. */
+  labelFor?: Partial<Record<Role, StringKey>>;
 }
 
 interface NavGroup {
-  label: string;
+  id: string;
+  labelKey: StringKey;
   items: NavItem[];
+}
+
+/** A nav item after role filtering and translation. */
+interface ResolvedNavItem {
+  id: TabId;
+  label: string;
+  icon: NavItem['icon'];
 }
 
 /**
@@ -70,98 +94,144 @@ interface NavGroup {
  */
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Care',
+    id: 'overview',
+    labelKey: 'nav.group.overview',
     items: [
-      // Renamed from "Persona Portal" — for a patient this destination now
-      // carries profile details only; appointments moved to their own pages.
-      // { id: 'portal', label: 'Persona Portal', icon: UserCheck },
-      { id: 'portal', label: 'Profile', icon: UserCheck },
-      // Renamed from "Consultations" — the page leads with who is booked in,
-      // and the consultation form opens from that list.
-      // { id: 'queue', label: 'Consultations', icon: Stethoscope, visibleTo: ['doctor', 'hospital', 'admin'] },
-      { id: 'queue', label: 'Appointments', icon: Stethoscope, visibleTo: ['doctor', 'hospital', 'admin'] },
-      // Closed consultations live behind their own destination — the working
-      // list stays strictly "who is still to be seen".
-      { id: 'completed', label: 'Completed', icon: CheckCircle2, visibleTo: ['doctor', 'hospital', 'admin'] },
-      // Doctors land here too, but on their own KPI dashboard — see
-      // DoctorDashboard, chosen by role in renderContent().
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visibleTo: ['doctor', 'admin', 'hospital'] },
+      // A patient's front door: next visit + fastest way to book.
+      { id: 'home', labelKey: 'nav.home', icon: Home, visibleTo: ['patient'] },
+      // Doctors land on their own KPI dashboard — see renderContent().
+      { id: 'dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard, visibleTo: ['doctor', 'admin', 'hospital'] },
+      // For the desk and admin the persona console IS the workspace.
+      {
+        id: 'portal',
+        labelKey: 'nav.deskWorkspace',
+        icon: Settings,
+        visibleTo: ['hospital', 'admin'],
+        labelFor: { admin: 'nav.adminWorkspace' },
+      },
     ],
   },
   {
-    label: 'Scheduling',
+    id: 'appointments',
+    labelKey: 'nav.group.appointments',
     items: [
-      // Patient-only destinations lifted out of the old portal's inner tabs.
-      { id: 'upcoming', label: 'Upcoming Appointment', icon: CalendarCheck, visibleTo: ['patient'] },
-      { id: 'book', label: 'Book Appointment', icon: Calendar, visibleTo: ['patient', 'hospital', 'admin'] },
-      { id: 'appt-history', label: 'Appointment History', icon: History, visibleTo: ['patient'] },
+      { id: 'book', labelKey: 'nav.book', icon: CalendarPlus, visibleTo: ['patient', 'hospital', 'admin'] },
+      { id: 'upcoming', labelKey: 'nav.myAppointments', icon: CalendarCheck, visibleTo: ['patient'] },
+      { id: 'appt-history', labelKey: 'nav.visitHistory', icon: History, visibleTo: ['patient'] },
+      // The working list — who is still to be seen.
+      {
+        id: 'queue',
+        labelKey: 'nav.appointments',
+        icon: Stethoscope,
+        visibleTo: ['doctor', 'hospital', 'admin'],
+        labelFor: { doctor: 'nav.myQueue' },
+      },
+      // Closed consultations live behind their own destination.
+      { id: 'completed', labelKey: 'nav.completed', icon: CheckCircle2, visibleTo: ['doctor', 'hospital', 'admin'] },
     ],
   },
   {
-    // One destination, two jobs — the desk composes here, a patient reads here.
-    // Deliberately NOT shown to doctors: clinic-wide announcements are a front
-    // desk function, and a consultant reaches their patients through the queue.
-    label: 'Communication',
+    // The desk composes here, a patient reads here. Not shown to doctors:
+    // clinic-wide announcements are a front desk function.
+    id: 'communication',
+    labelKey: 'nav.group.communication',
+    items: [{ id: 'messages', labelKey: 'nav.messages', icon: MessageSquare, visibleTo: ['patient', 'hospital', 'admin'] }],
+  },
+  {
+    id: 'records',
+    labelKey: 'nav.group.records',
     items: [
-      { id: 'messages', label: 'Messages', icon: MessageSquare, visibleTo: ['patient', 'hospital', 'admin'] },
+      { id: 'patients', labelKey: 'nav.clinicalPatients', icon: Users, visibleTo: ['doctor', 'hospital', 'admin'] },
+      { id: 'documents', labelKey: 'nav.documentVault', icon: FileText, labelFor: { patient: 'nav.healthVault' } },
     ],
   },
   {
-    label: 'Records',
-    items: [
-      { id: 'patients', label: 'Clinical Patients', icon: Users, visibleTo: ['doctor', 'hospital', 'admin'] },
-      { id: 'documents', label: 'Document Vault', icon: FileText },
-    ],
+    id: 'network',
+    labelKey: 'nav.group.network',
+    items: [{ id: 'onboarding', labelKey: 'nav.doctorOnboarding', icon: UserPlus, visibleTo: ['admin'] }],
+  },
+  {
+    id: 'account',
+    labelKey: 'nav.group.account',
+    items: [{ id: 'portal', labelKey: 'nav.profile', icon: UserCheck, visibleTo: ['patient', 'doctor'] }],
   },
 ];
 
-const PAGE_META: Record<TabId, { title: string; subtitle: string }> = {
-  // portal: { title: 'Persona Portal', subtitle: 'Your role-based clinical workspace' },
-  portal: { title: 'Profile', subtitle: 'Your personal, contact and medical profile details' },
-  upcoming: { title: 'Upcoming Appointment', subtitle: 'Your confirmed consultation and its reminders' },
-  'appt-history': { title: 'Appointment History', subtitle: 'Previous visits, prescriptions and tax invoices' },
-  // queue: { title: 'Consultations', subtitle: 'Your patient queue, history and prescriptions' },
-  queue: { title: 'Appointments', subtitle: 'Patients still to be seen — follow-ups and new visits' },
-  completed: { title: 'Completed', subtitle: 'Closed consultations, prescriptions and case records' },
-  dashboard: { title: 'Care Dashboard', subtitle: 'OPD load, telehealth activity and collections' },
-  book: { title: 'Book Appointment', subtitle: 'Search consultants and reserve an OPD or video slot' },
-  patients: { title: 'Clinical Patients', subtitle: 'Longitudinal history, conditions and case notes' },
-  documents: { title: 'Document Vault', subtitle: 'Reports, prescriptions and AI clinical summaries' },
-  // Overridden per role below — the desk writes here, a patient reads here.
-  messages: { title: 'Messages', subtitle: 'Notices from the clinic' },
-  telehealth: { title: 'Telehealth Room', subtitle: 'Live video consultation cabin' },
+/** Page header title + subtitle keys, per destination. */
+const PAGE_META: Record<TabId, { title: StringKey; subtitle: StringKey }> = {
+  home: { title: 'page.home.title', subtitle: 'page.home.sub' },
+  portal: { title: 'page.profile.title', subtitle: 'page.profile.subPatient' },
+  upcoming: { title: 'page.upcoming.title', subtitle: 'page.upcoming.sub' },
+  'appt-history': { title: 'page.history.title', subtitle: 'page.history.sub' },
+  queue: { title: 'page.queue.title', subtitle: 'page.queue.sub' },
+  completed: { title: 'page.completed.title', subtitle: 'page.completed.sub' },
+  dashboard: { title: 'page.dashboard.title', subtitle: 'page.dashboard.sub' },
+  book: { title: 'page.book.title', subtitle: 'page.book.sub' },
+  patients: { title: 'page.patients.title', subtitle: 'page.patients.sub' },
+  documents: { title: 'page.documents.title', subtitle: 'page.documents.sub' },
+  messages: { title: 'page.messages.title', subtitle: 'page.messages.subPatient' },
+  telehealth: { title: 'page.telehealth.title', subtitle: 'page.telehealth.sub' },
+  onboarding: { title: 'page.onboarding.title', subtitle: 'page.onboarding.sub' },
 };
 
 /**
  * The Profile destination is shared by every role but means something different
  * to each: a patient's own record, a doctor's practice profile, or — for front
- * desk and admin — their full persona workspace, which still lives there.
+ * desk and admin — their full persona workspace.
  */
-const PORTAL_SUBTITLE: Record<Role, string> = {
-  patient: 'Your personal, contact and medical profile details',
-  doctor: 'Your practice profile, chamber and consulting details',
-  hospital: 'Your role-based clinical workspace',
-  admin: 'Your role-based clinical workspace',
+const PORTAL_META: Record<Role, { title: StringKey; subtitle: StringKey }> = {
+  patient: { title: 'page.profile.title', subtitle: 'page.profile.subPatient' },
+  doctor: { title: 'page.profile.title', subtitle: 'page.profile.subDoctor' },
+  hospital: { title: 'page.desk.title', subtitle: 'page.desk.sub' },
+  admin: { title: 'page.admin.title', subtitle: 'page.admin.sub' },
 };
 
 /** Same rail entry, opposite ends of the conversation. */
-const MESSAGES_SUBTITLE: Record<Role, string> = {
-  patient: 'Delay notices and announcements from the clinic',
-  doctor: 'Notices from the clinic',
-  hospital: 'Send delay notices and announcements to patients',
-  admin: 'Send delay notices and announcements to patients',
+const MESSAGES_SUBTITLE: Record<Role, StringKey> = {
+  patient: 'page.messages.subPatient',
+  doctor: 'page.messages.subDoctor',
+  hospital: 'page.messages.subStaff',
+  admin: 'page.messages.subStaff',
 };
 
-const ROLE_LABEL: Record<Role, string> = {
-  patient: 'Patient',
-  doctor: 'Consultant',
-  hospital: 'Front Desk',
-  admin: 'Administrator',
-};
+/* -------------------------------------------------------------------------
+   Session persistence — a refresh used to sign everyone out mid-task.
+   ------------------------------------------------------------------------- */
+const SESSION_KEY = 'nexgen.session.v1';
+
+interface StoredSession {
+  user: LoggedInUser;
+  tab: TabId;
+}
+
+function readSession(): StoredSession | null {
+  try {
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredSession;
+    if (!parsed?.user?.id || !parsed.user.role) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function landingTabFor(role: Role): TabId {
+  if (role === 'patient') return 'home';
+  if (role === 'doctor') return doctorPortalConfig.landOnDashboard ? 'dashboard' : 'portal';
+  return 'portal';
+}
+
+interface ActiveBookIntent extends BookIntent {
+  /** Remounts the booking wizard so a new intent starts it fresh. */
+  nonce: number;
+}
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<LoggedInUser | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>('portal');
+  const { t } = usePreferences();
+  const restored = useMemo(readSession, []);
+  const [currentUser, setCurrentUser] = useState<LoggedInUser | null>(restored?.user ?? null);
+  const [activeTab, setActiveTab] = useState<TabId>(restored?.tab ?? 'home');
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [patients, setPatients] = useState<PatientHistory[]>([]);
   const [documents, setDocuments] = useState<MedicalDocument[]>([]);
@@ -173,6 +243,28 @@ export default function App() {
   const [hasLoadedOnce, setHasLoadedOnce] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [isNavOpen, setIsNavOpen] = useState<boolean>(false);
+
+  // Signed-out: the public website, or the sign-in screen.
+  const [publicView, setPublicView] = useState<'landing' | 'login'>('landing');
+  /** What the visitor was doing when we asked them to sign in. */
+  const [pendingIntent, setPendingIntent] = useState<BookIntent | null>(null);
+  const [loginMessage, setLoginMessage] = useState<string>('');
+  /** What the booking wizard should open with. */
+  const [bookIntent, setBookIntent] = useState<ActiveBookIntent>({ nonce: 0 });
+
+  // Persist the session (never the transient telehealth room).
+  useEffect(() => {
+    try {
+      if (currentUser) {
+        const tab = activeTab === 'telehealth' ? landingTabFor(currentUser.role) : activeTab;
+        window.localStorage.setItem(SESSION_KEY, JSON.stringify({ user: currentUser, tab }));
+      } else {
+        window.localStorage.removeItem(SESSION_KEY);
+      }
+    } catch {
+      /* private mode / storage full — the session simply won't survive a refresh */
+    }
+  }, [currentUser, activeTab]);
 
   // Close the mobile drawer on Escape and lock the page behind it while open.
   useEffect(() => {
@@ -230,11 +322,86 @@ export default function App() {
     loadAllData();
   }, []);
 
+  /**
+   * A restored session must still point at a real record — after a data reset
+   * the stored patient or doctor may be gone, and every page would then render
+   * someone else's (or nobody's) data.
+   */
+  useEffect(() => {
+    if (!hasLoadedOnce || !currentUser) return;
+    const exists =
+      currentUser.role === 'patient'
+        ? patients.some(p => p.id === currentUser.id)
+        : currentUser.role === 'doctor'
+        ? doctors.some(d => d.id === currentUser.id)
+        : true;
+    if (!exists) {
+      setCurrentUser(null);
+      setPublicView('login');
+    }
+  }, [hasLoadedOnce, currentUser, patients, doctors]);
+
   const goToTab = useCallback((tab: TabId, opts?: { keepConsultation?: boolean }) => {
     setActiveTab(tab);
     if (!opts?.keepConsultation) setActiveAppointment(null);
     setIsNavOpen(false);
+    window.scrollTo({ top: 0 });
   }, []);
+
+  /** Open the booking wizard with a doctor, search or speciality already chosen. */
+  const startBooking = useCallback(
+    (intent: BookIntent = {}) => {
+      setBookIntent({ ...intent, nonce: Date.now() });
+      goToTab('book');
+    },
+    [goToTab]
+  );
+
+  /** Public site → "Book": remember the choice, sign in, then carry on. */
+  const handlePublicBook = (doctor: Doctor | null, search?: string) => {
+    setPendingIntent({ doctorId: doctor?.id, search });
+    setLoginMessage(doctor ? `Sign in to book ${doctor.name}` : 'Sign in to book your appointment');
+    setPublicView('login');
+    window.scrollTo({ top: 0 });
+  };
+
+  const handleLoginSuccess = (u: LoggedInUser) => {
+    setCurrentUser(u);
+    setPublicView('landing');
+    setLoginMessage('');
+    if (pendingIntent && u.role !== 'doctor') {
+      setBookIntent({ ...pendingIntent, nonce: Date.now() });
+      setActiveTab('book');
+    } else {
+      setActiveTab(landingTabFor(u.role));
+    }
+    setPendingIntent(null);
+    window.scrollTo({ top: 0 });
+  };
+
+  const handleSignOut = () => {
+    setCurrentUser(null);
+    setActiveTab('home');
+    setActiveAppointment(null);
+    setIsNavOpen(false);
+    setPublicView('landing');
+  };
+
+  /** POST helper that always resolves to the JSON body, with `error` on failure. */
+  const postJson = async (url: string, body: unknown) => {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body ?? {}),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: json.error || 'Something went wrong. Please try again.' };
+      return json;
+    } catch {
+      return { error: 'Network communication failure.' };
+    }
+  };
 
   // Action Handlers
   const handleBookAppointment = async (bookingData: any) => {
@@ -256,22 +423,6 @@ export default function App() {
     } catch (err) {
       console.error(err);
       return { error: 'Network communication failure.' };
-    }
-  };
-
-  const handleCancelAppointment = async (apptId: string) => {
-    if (!window.confirm('Are you sure you want to cancel this scheduled appointment?')) {
-      return;
-    }
-    try {
-      const response = await fetch(`/api/appointments/${apptId}/cancel`, {
-        method: 'POST',
-      });
-      if (response.ok) {
-        await loadAllData();
-      }
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -541,72 +692,143 @@ export default function App() {
     }
   };
 
+
+  /**
+   * Staff cancel (dashboard, queue): confirm in the browser, then cancel as
+   * that role so the server applies staff rules (refund in full, allowed after
+   * the slot has started).
+   */
+  const handleCancelAppointment = async (apptId: string) => {
+    if (!window.confirm('Are you sure you want to cancel this scheduled appointment?')) {
+      return;
+    }
+    const result = await postJson(`/api/appointments/${apptId}/cancel`, { actorRole: currentUser?.role });
+    if (result?.error) {
+      window.alert(result.error);
+      return;
+    }
+    await loadAllData();
+  };
+
+  /** Patient cancel from My Appointments — the page shows its own confirmation. */
+  const handlePatientCancel = async (apptId: string, reason: string) => {
+    const result = await postJson(`/api/appointments/${apptId}/cancel`, { actorRole: 'patient', reason });
+    if (!result?.error) await loadAllData();
+    return result;
+  };
+
+  /** Move a booking in place — same booking number, fee carried over. */
+  const handleRescheduleAppointment = async (
+    apptId: string,
+    data: { date: string; timeSlot: string; type: 'visiting' | 'video' }
+  ) => {
+    const result = await postJson(`/api/appointments/${apptId}/reschedule`, data);
+    if (!result?.error) await loadAllData();
+    return result;
+  };
+
+  const handlePayPlatformFee = async (apptId: string, method: string) => {
+    const result = await postJson(`/api/appointments/${apptId}/pay`, { paymentMethod: method });
+    if (!result?.error) await loadAllData();
+    return result;
+  };
+
+  const handleFeedback = async (apptId: string, rating: number, text: string) => {
+    const result = await postJson(`/api/appointments/${apptId}/feedback`, { rating, text });
+    if (!result?.error) await loadAllData();
+    return result;
+  };
+
   /** Role-filtered navigation, with the live consultation appended when one is running. */
-  const visibleGroups = useMemo<NavGroup[]>(() => {
+  const visibleGroups = useMemo<Array<{ id: string; label: string; items: ResolvedNavItem[] }>>(() => {
     if (!currentUser) return [];
 
     // A doctor's standalone Records pages are withdrawn by default: everything
-    // in them — patient history, documents, past visits — is already shown in
-    // context inside their appointment queue. See VITE_DOCTOR_HIDE_RECORDS_MENU.
+    // in them is already shown in context inside their appointment queue.
     const hideRecords = currentUser.role === 'doctor' && doctorPortalConfig.hideRecordsMenu;
 
-    const groups = NAV_GROUPS.filter(group => !(hideRecords && group.label === 'Records'))
+    const groups = NAV_GROUPS.filter(group => !(hideRecords && group.id === 'records'))
       .map(group => ({
-        ...group,
-        items: group.items.filter(item => !item.visibleTo || item.visibleTo.includes(currentUser.role)),
+        id: group.id,
+        label: t(group.labelKey),
+        items: group.items
+          .filter(item => !item.visibleTo || item.visibleTo.includes(currentUser.role))
+          .map(item => ({ id: item.id, icon: item.icon, label: t(item.labelFor?.[currentUser.role] ?? item.labelKey) })),
       }))
       .filter(group => group.items.length > 0);
 
     if (activeAppointment) {
       groups.push({
-        label: 'In Session',
-        items: [{ id: 'telehealth', label: 'Telehealth Room', icon: Video }],
+        id: 'in-session',
+        label: t('nav.group.inSession'),
+        items: [{ id: 'telehealth', label: t('nav.telehealth'), icon: Video }],
       });
     }
     return groups;
-  }, [currentUser, activeAppointment]);
+  }, [currentUser, activeAppointment, t]);
 
-  /**
-   * Unread desk messages, for the rail badge.
-   *
-   * Patients only: a delay notice is worthless if it sits behind an unmarked
-   * menu item. Staff see their own outbox on that page, which has no unread
-   * concept — they wrote it.
-   */
+  /** Unread desk messages, for the rail badge (patients only). */
   const unreadMessageCount = useMemo(() => {
     if (currentUser?.role !== 'patient') return 0;
-    return messages.filter(m =>
-      m.recipients.some(r => r.patientId === currentUser.id && !r.readAt)
-    ).length;
+    return messages.filter(m => m.recipients.some(r => r.patientId === currentUser.id && !r.readAt)).length;
   }, [messages, currentUser]);
 
+  /** Upcoming bookings still owing the ₹50, for the patient's rail badge. */
+  const feeDueCount = useMemo(() => {
+    if (currentUser?.role !== 'patient') return 0;
+    return appointments.filter(a => a.patientId === currentUser.id && a.status === 'scheduled' && !a.feePaid).length;
+  }, [appointments, currentUser]);
+
   /**
-   * Never leave a role parked on a destination its rail no longer offers — a
-   * doctor with the Records group withdrawn must not keep rendering it because
-   * an earlier link put them there.
+   * Never leave a role parked on a destination its rail no longer offers.
    */
   useEffect(() => {
     if (!currentUser || activeTab === 'telehealth') return;
     const reachable = visibleGroups.some(group => group.items.some(item => item.id === activeTab));
-    if (!reachable) setActiveTab(visibleGroups[0]?.items[0]?.id ?? 'portal');
+    if (!reachable) setActiveTab(landingTabFor(currentUser.role));
   }, [currentUser, visibleGroups, activeTab]);
+
+  const navigate = (tab: string) => goToTab(tab as TabId);
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'home':
+        return currentUser ? (
+          <PatientHome
+            currentUser={currentUser}
+            patients={patients}
+            doctors={doctors}
+            appointments={appointments}
+            documents={documents}
+            onNavigate={navigate}
+            onBook={startBooking}
+            onJoinVideo={handleJoinVideoRoom}
+          />
+        ) : null;
+      case 'upcoming':
+        // A patient's appointments get a dedicated page; staff never reach it.
+        return currentUser ? (
+          <MyAppointments
+            currentUser={currentUser}
+            doctors={doctors}
+            patients={patients}
+            appointments={appointments}
+            onBook={startBooking}
+            onJoinVideo={handleJoinVideoRoom}
+            onCancel={handlePatientCancel}
+            onReschedule={handleRescheduleAppointment}
+            onPay={handlePayPlatformFee}
+            onFeedback={handleFeedback}
+          />
+        ) : null;
       /**
        * One console, several destinations. Patients and doctors get a trimmed
-       * profile page — their appointment work lives on its own rail entry
-       * ("Upcoming Appointment" / "Appointments"). Front desk and admin keep
-       * the full persona console here, because for them that view *is* the
-       * whole workspace.
+       * profile page; front desk and admin keep the full persona console.
        */
       case 'portal':
-      case 'upcoming':
       case 'appt-history': {
         const consoleView =
-          activeTab === 'upcoming'
-            ? 'upcoming'
-            : activeTab === 'appt-history'
+          activeTab === 'appt-history'
             ? 'history'
             : currentUser?.role === 'patient' || currentUser?.role === 'doctor'
             ? 'profile'
@@ -631,8 +853,6 @@ export default function App() {
           />
         );
       }
-      // One component, two destinations: the pending working list and the
-      // closed-consultation archive behind it.
       case 'queue':
       case 'completed':
         return (
@@ -645,11 +865,17 @@ export default function App() {
             view={activeTab === 'completed' ? 'completed' : 'pending'}
             onJoinVideo={handleJoinVideoRoom}
             onCompleteConsultation={handleCompleteConsultation}
+            onCollectFee={
+              currentUser?.role === 'hospital' || currentUser?.role === 'admin'
+                ? async id => {
+                    const res = await handlePayPlatformFee(id, 'Cash at counter');
+                    if (res?.error) window.alert(res.error);
+                  }
+                : undefined
+            }
           />
         );
       case 'dashboard':
-        // Same rail entry, two reports: a consultant sees their own practice,
-        // the clinic roles see the whole OPD.
         if (currentUser?.role === 'doctor') {
           return (
             <DoctorDashboard
@@ -657,7 +883,7 @@ export default function App() {
               doctors={doctors}
               patients={patients}
               currentUser={currentUser}
-              onNavigate={(tab) => goToTab(tab as TabId)}
+              onNavigate={navigate}
               onJoinVideo={handleJoinVideoRoom}
             />
           );
@@ -668,20 +894,29 @@ export default function App() {
             doctors={doctors}
             patients={patients}
             documents={documents}
-            onNavigate={(tab) => goToTab(tab as TabId)}
+            onNavigate={navigate}
             onJoinVideo={handleJoinVideoRoom}
             onCancelAppointment={handleCancelAppointment}
             onBookAppointment={handleBookAppointment}
+            onRescheduleAppointment={handleRescheduleAppointment}
           />
         );
       case 'book':
         return (
-          <DoctorBooking
-            doctors={doctors}
-            patients={patients}
-            onBookAppointment={handleBookAppointment}
-            currentUser={currentUser}
-          />
+          // Keyed by the intent so "Book again" / a speciality tile always
+          // opens a fresh wizard with its own preselection.
+          <React.Fragment key={bookIntent.nonce}>
+            <DoctorBooking
+              doctors={doctors}
+              patients={patients}
+              onBookAppointment={handleBookAppointment}
+              currentUser={currentUser}
+              preselectedDoctorId={bookIntent.doctorId}
+              initialSearch={bookIntent.search}
+              initialDepartment={bookIntent.department}
+              onViewAppointments={currentUser?.role === 'patient' ? () => goToTab('upcoming') : undefined}
+            />
+          </React.Fragment>
         );
       case 'patients':
         return (
@@ -693,8 +928,6 @@ export default function App() {
           />
         );
       case 'messages':
-        // One component, two roles: the desk composes and reviews its outbox,
-        // a patient reads their inbox. MessageCenter picks by currentUser.role.
         return (
           <MessageCenter
             messages={messages}
@@ -715,17 +948,17 @@ export default function App() {
             onAnalyzeDocument={handleAnalyzeDocument}
           />
         );
+      case 'onboarding':
+        return <DoctorApplications doctors={doctors} onChanged={loadAllData} />;
       case 'telehealth':
-        // No live consultation to show — offer a way back rather than
-        // redirecting to a tab this role may not be allowed to open.
-        if (!activeAppointment) return <NoActiveConsultation onDismiss={() => goToTab('portal')} />;
+        if (!activeAppointment) return <NoActiveConsultation onDismiss={() => goToTab(currentUser ? landingTabFor(currentUser.role) : 'home')} />;
         return (
           <TelehealthCabin
             appointment={activeAppointment}
             doctors={doctors}
             patients={patients}
             onCompleteConsultation={handleCompleteConsultation}
-            onExitCabin={() => goToTab('portal')}
+            onExitCabin={() => goToTab(currentUser ? landingTabFor(currentUser.role) : 'home')}
           />
         );
       default:
@@ -735,10 +968,8 @@ export default function App() {
 
   /**
    * Only the very first load is allowed to replace the screen. Every mutation
-   * (booking, upload, profile save) calls loadAllData() to refresh, and gating
-   * the content area on `isLoading` unmounted whatever screen was open —
-   * which discarded the booking wizard's state and made its confirmation step
-   * unreachable. Later refresh failures surface as a banner instead.
+   * calls loadAllData() to refresh; gating the content on `isLoading` would
+   * unmount whatever screen was open. Later failures surface as a banner.
    */
   const body = !hasLoadedOnce
     ? isLoading
@@ -752,18 +983,49 @@ export default function App() {
     hasLoadedOnce && error ? <RefreshBanner message={error} onRetry={loadAllData} /> : null;
 
   /* ---------------------------------------------------------------------
-     Signed out — a quiet, single-column entry screen.
+     Signed out — the public website, or the sign-in screen.
      --------------------------------------------------------------------- */
   if (!currentUser) {
+    if (publicView === 'landing') {
+      return (
+        <>
+          {!hasLoadedOnce && error && (
+            <div className="fixed inset-x-0 top-0 z-[70] p-3">
+              <RefreshBanner message={error} onRetry={loadAllData} />
+            </div>
+          )}
+          <LandingPage
+            doctors={doctors}
+            appointments={appointments}
+            onSignIn={() => {
+              setPendingIntent(null);
+              setLoginMessage('');
+              setPublicView('login');
+              window.scrollTo({ top: 0 });
+            }}
+            onBook={handlePublicBook}
+          />
+        </>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-canvas text-ink font-sans antialiased flex flex-col">
         <header className="border-b border-hairline bg-surface">
           <div className="flex h-16 w-full items-center gap-4 px-5 lg:px-8">
-            <Brand tone="light" />
-            {/* Role portal switcher lands here. Login owns the state and the
-                rules about when the switcher applies, so it renders the tabs
-                into this slot rather than App second-guessing either. */}
+            <button
+              type="button"
+              onClick={() => setPublicView('landing')}
+              className="cursor-pointer"
+              aria-label="Back to the neXgen website"
+            >
+              <Logo size="sm" />
+            </button>
+            {/* Role portal switcher lands here (Login renders into this slot). */}
             <div id="auth-header-slot" className="ml-auto flex min-w-0 items-center" />
+            <div className="hidden shrink-0 sm:block">
+              <PreferenceToggles />
+            </div>
           </div>
         </header>
         <main className="flex-1">
@@ -771,18 +1033,10 @@ export default function App() {
             <Login
               doctors={doctors}
               patients={patients}
-              /* Self-registration creates the record and refreshes the
-                 directory, so the new profile exists by the time the patient
-                 is dropped on their Profile page to complete it. */
               onRegisterPatient={handleSavePatient}
-              onLoginSuccess={(u) => {
-                setCurrentUser(u);
-                // A consultant opens on their KPI dashboard rather than their
-                // profile page — see VITE_DOCTOR_LAND_ON_DASHBOARD.
-                setActiveTab(
-                  u.role === 'doctor' && doctorPortalConfig.landOnDashboard ? 'dashboard' : 'portal'
-                );
-              }}
+              onLoginSuccess={handleLoginSuccess}
+              intentMessage={loginMessage}
+              onBackToSite={() => setPublicView('landing')}
             />
           )}
         </main>
@@ -790,16 +1044,25 @@ export default function App() {
     );
   }
 
-  let meta = PAGE_META[activeTab];
+  let metaKeys = PAGE_META[activeTab];
   if (activeTab === 'portal') {
-    meta = { ...PAGE_META.portal, subtitle: PORTAL_SUBTITLE[currentUser.role] };
+    metaKeys = PORTAL_META[currentUser.role];
   } else if (activeTab === 'messages') {
-    meta = { ...PAGE_META.messages, subtitle: MESSAGES_SUBTITLE[currentUser.role] };
+    metaKeys = { ...PAGE_META.messages, subtitle: MESSAGES_SUBTITLE[currentUser.role] };
   } else if (activeTab === 'dashboard' && currentUser.role === 'doctor') {
-    // The dashboard destination is shared, but a consultant's version reports
-    // their own practice rather than the clinic's.
-    meta = { title: 'My Dashboard', subtitle: 'Your OPD load, queue and consultation activity' };
+    metaKeys = { title: 'page.myDashboard.title', subtitle: 'page.myDashboard.sub' };
+  } else if (activeTab === 'queue' && currentUser.role === 'doctor') {
+    metaKeys = { title: 'page.myQueue.title', subtitle: 'page.myQueue.sub' };
+  } else if (activeTab === 'book' && currentUser.role !== 'patient') {
+    metaKeys = { title: 'page.book.title', subtitle: 'page.bookStaff.sub' };
+  } else if (activeTab === 'documents' && currentUser.role === 'patient') {
+    metaKeys = { title: 'page.healthVault.title', subtitle: 'page.healthVault.sub' };
   }
+  const meta = { title: t(metaKeys.title), subtitle: t(metaKeys.subtitle) };
+
+  const theme = ROLE_THEME[currentUser.role];
+  const canBook = currentUser.role !== 'doctor';
+  const showPatientTabBar = currentUser.role === 'patient' && activeTab !== 'book' && activeTab !== 'telehealth';
 
   /* ---------------------------------------------------------------------
      Signed in — fixed left rail + content column.
@@ -817,27 +1080,45 @@ export default function App() {
 
       {/* ---------------------------- Left rail ---------------------------- */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[264px] flex-col bg-slate-950 transition-transform duration-300 ease-out lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[268px] flex-col overflow-hidden bg-slate-950 transition-transform duration-300 ease-out lg:translate-x-0 ${
           isNavOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Brand */}
-        <div className="clinical-grid relative flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-5">
-          <Brand tone="dark" />
+        {/* Role glow — each console carries its own colour */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full blur-3xl"
+          style={{ background: theme.soft }}
+        />
+
+        <div className="relative flex h-[72px] shrink-0 items-center justify-between border-b border-white/10 px-5">
+          <Logo role={currentUser.role} tone="dark" size="sm" showRoleLabel />
           <button
             onClick={() => setIsNavOpen(false)}
             className="-mr-1 rounded-md p-1.5 text-white/50 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
-            aria-label="Close navigation"
+            aria-label={t('shell.closeNav')}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Sections */}
-        <nav aria-label="Primary" className="rail-scroll flex-1 overflow-y-auto px-3 py-5">
+        {canBook && (
+          <div className="relative px-4 pt-4">
+            <button
+              type="button"
+              onClick={() => startBooking({})}
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-coral-500 py-2.5 text-[13px] font-bold text-white shadow-lg shadow-coral-500/20 transition-colors hover:bg-coral-600"
+            >
+              <CalendarPlus className="h-4 w-4" />
+              {currentUser.role === 'patient' ? t('nav.bookCtaPatient') : t('nav.bookCtaStaff')}
+            </button>
+          </div>
+        )}
+
+        <nav aria-label="Primary" className="rail-scroll relative flex-1 overflow-y-auto px-3 py-4">
           {visibleGroups.map((group, groupIndex) => (
-            <div key={group.label} className={groupIndex > 0 ? 'mt-6' : ''}>
-              <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">
+            <div key={group.id} className={groupIndex > 0 ? 'mt-5' : ''}>
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">
                 {group.label}
               </p>
               <ul className="space-y-0.5">
@@ -845,36 +1126,43 @@ export default function App() {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
                   const isLive = item.id === 'telehealth';
+                  const badge =
+                    item.id === 'messages' ? unreadMessageCount : item.id === 'upcoming' ? feeDueCount : 0;
                   return (
-                    <li key={item.id}>
+                    <li key={`${group.id}-${item.id}`}>
                       <button
-                        onClick={() => goToTab(item.id, { keepConsultation: true })}
+                        onClick={() =>
+                          item.id === 'book' ? startBooking({}) : goToTab(item.id, { keepConsultation: true })
+                        }
                         aria-current={isActive ? 'page' : undefined}
-                        className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${
-                          isActive ? 'bg-white/[0.07] text-white' : 'text-white/60 hover:bg-white/[0.04] hover:text-white/90'
+                        className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13.5px] font-semibold transition-colors ${
+                          isActive ? 'bg-white/[0.09] text-white' : 'text-white/60 hover:bg-white/[0.05] hover:text-white/90'
                         }`}
                       >
                         {isActive && (
                           <span
                             aria-hidden="true"
-                            className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-indigo-400"
+                            className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
+                            style={{ background: theme.accent }}
                           />
                         )}
                         <Icon
-                          className={`h-[18px] w-[18px] shrink-0 transition-colors ${
-                            isActive ? 'text-indigo-300' : 'text-white/40 group-hover:text-white/70'
-                          }`}
+                          className={`h-[18px] w-[18px] shrink-0 transition-colors ${isActive ? '' : 'text-white/40 group-hover:text-white/70'}`}
+                          style={isActive ? { color: theme.accent } : undefined}
                         />
                         <span className="truncate">{item.label}</span>
-                        {item.id === 'messages' && unreadMessageCount > 0 && (
-                          <span className="ml-auto rounded-full bg-indigo-500 px-1.5 py-0.5 font-mono text-[9px] font-bold text-white">
-                            {unreadMessageCount}
+                        {badge > 0 && (
+                          <span
+                            className="ml-auto rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-950"
+                            style={{ background: theme.accent }}
+                          >
+                            {badge}
                           </span>
                         )}
                         {isLive && (
                           <span className="ml-auto flex items-center gap-1.5 rounded-full bg-rose-500/15 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-rose-300">
                             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400" />
-                            Live
+                            {t('nav.live')}
                           </span>
                         )}
                       </button>
@@ -887,49 +1175,37 @@ export default function App() {
         </nav>
 
         {/* Session footer */}
-        <div className="shrink-0 border-t border-white/10 p-3">
-          <div className="mb-2 flex items-center gap-2 px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-white/35">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            </span>
-            OPD &amp; Telehealth live
-          </div>
-
-          <div className="flex items-center gap-2.5 rounded-lg bg-white/[0.04] p-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-indigo-500/20 font-serif text-sm font-semibold text-indigo-200 ring-1 ring-indigo-400/25">
-              {currentUser.name[0]}
-            </div>
+        <div className="relative shrink-0 border-t border-white/10 p-3">
+          <div className="flex items-center gap-2.5 rounded-xl bg-white/[0.05] p-2.5">
+            <LogoMark size={34} role={currentUser.role} showBadge={false} />
             <div className="min-w-0 flex-1 leading-tight">
-              <p className="truncate text-[13px] font-medium text-white">{currentUser.name}</p>
-              <p className="font-mono text-[10px] uppercase tracking-wider text-white/40">
-                {ROLE_LABEL[currentUser.role]}
+              <p className="truncate text-[13px] font-semibold text-white">{currentUser.name}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: theme.accent }}>
+                {t(`role.${currentUser.role}` as StringKey)}
               </p>
             </div>
             <button
-              onClick={() => {
-                setCurrentUser(null);
-                setActiveTab('portal');
-                setActiveAppointment(null);
-                setIsNavOpen(false);
-              }}
-              title="Sign out"
-              aria-label="Sign out"
+              onClick={handleSignOut}
+              title={t('common.signOut')}
+              aria-label={t('common.signOut')}
               className="shrink-0 cursor-pointer rounded-md p-1.5 text-white/40 transition-colors hover:bg-rose-500/15 hover:text-rose-300"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
+          <p className="mt-2 text-center text-[9.5px] font-semibold uppercase tracking-[0.18em] text-white/25">
+            Powered by SRM ECO TECH
+          </p>
         </div>
       </aside>
 
       {/* --------------------------- Content column -------------------------- */}
-      <div className="lg:pl-[264px]">
+      <div className="lg:pl-[268px]">
         <header className="sticky top-0 z-30 border-b border-hairline bg-canvas/85 backdrop-blur-md">
           <div className="flex h-16 items-center gap-3 px-5 lg:px-8">
             <button
               onClick={() => setIsNavOpen(true)}
-              aria-label="Open navigation"
+              aria-label={t('shell.openNav')}
               aria-expanded={isNavOpen}
               className="-ml-1.5 cursor-pointer rounded-lg p-2 text-ink-soft transition-colors hover:bg-surface hover:text-ink lg:hidden"
             >
@@ -937,24 +1213,75 @@ export default function App() {
             </button>
 
             <div className="min-w-0 flex-1">
-              <h1 className="truncate font-serif text-lg font-semibold leading-tight tracking-tight text-ink">
-                {meta.title}
-              </h1>
-              <p className="hidden truncate text-[11px] text-ink-soft sm:block">{meta.subtitle}</p>
+              <h1 className="truncate text-lg font-bold leading-tight tracking-tight text-ink">{meta.title}</h1>
+              <p className="hidden truncate text-[12px] text-ink-soft sm:block">{meta.subtitle}</p>
             </div>
 
-            <span className="hidden items-center gap-1.5 rounded-md border border-hairline bg-surface px-2.5 py-1.5 font-mono text-[11px] text-ink-soft sm:inline-flex">
+            {canBook && activeTab !== 'book' && (
+              <button
+                type="button"
+                onClick={() => startBooking({})}
+                className="hidden cursor-pointer items-center gap-2 rounded-xl bg-coral-500 px-3.5 py-2 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-coral-600 md:inline-flex"
+              >
+                <CalendarPlus className="h-4 w-4" /> {t('common.bookAppointment')}
+              </button>
+            )}
+
+            <PreferenceToggles compact />
+
+            <span className="hidden items-center gap-1.5 rounded-lg border border-hairline bg-surface px-2.5 py-1.5 font-mono text-[11px] text-ink-soft 2xl:inline-flex">
               <Calendar className="h-3.5 w-3.5" />
               {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
             </span>
           </div>
         </header>
 
-        <main key={activeTab} className="page-enter px-5 py-6 lg:px-8 lg:py-8">
+        <main key={activeTab} className={`page-enter px-4 py-6 sm:px-5 lg:px-8 lg:py-8 ${showPatientTabBar ? 'pb-28 lg:pb-8' : ''}`}>
           {refreshBanner}
           {body ?? renderContent()}
         </main>
       </div>
+
+      {/* Mobile tab bar — the five things a patient does, one thumb away. */}
+      {showPatientTabBar && (
+        <nav
+          aria-label="Quick navigation"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.4rem)] pt-1.5 backdrop-blur lg:hidden"
+        >
+          <ul className="grid grid-cols-5">
+            {([
+              { id: 'home', label: t('tab.home'), icon: Home },
+              { id: 'upcoming', label: t('tab.visits'), icon: CalendarCheck },
+              { id: 'book', label: t('tab.book'), icon: CalendarPlus },
+              { id: 'documents', label: t('tab.vault'), icon: FileText },
+              { id: 'portal', label: t('tab.profile'), icon: UserCheck },
+            ] as Array<{ id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }>).map(item => {
+              const active = activeTab === item.id;
+              const isBook = item.id === 'book';
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => (isBook ? startBooking({}) : goToTab(item.id))}
+                    className={`flex w-full cursor-pointer flex-col items-center gap-0.5 py-1 text-[11px] font-semibold ${
+                      active ? 'text-indigo-700' : 'text-slate-500'
+                    }`}
+                  >
+                    {isBook ? (
+                      <span className="-mt-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-coral-500 text-white shadow-lg shadow-coral-500/30">
+                        <item.icon className="h-6 w-6" />
+                      </span>
+                    ) : (
+                      <item.icon className="h-5 w-5" />
+                    )}
+                    {item.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
     </div>
   );
 }
@@ -963,58 +1290,34 @@ export default function App() {
    Shell primitives
    ======================================================================== */
 
-function Brand({ tone }: { tone: 'light' | 'dark' }) {
-  const isDark = tone === 'dark';
-  return (
-    <div className="flex items-center gap-2.5">
-      <div
-        className={`flex h-8 w-8 items-center justify-center rounded-md ${
-          isDark
-            ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-400/30'
-            : 'bg-indigo-600 text-white'
-        }`}
-      >
-        <Activity className="h-4 w-4" />
-      </div>
-      <div className="leading-tight">
-        <p className={`font-serif text-[15px] font-semibold tracking-tight ${isDark ? 'text-white' : 'text-ink'}`}>
-          neXgen
-        </p>
-        <p
-          className={`text-[9px] font-medium uppercase tracking-[0.18em] ${
-            isDark ? 'text-white/40' : 'text-ink-soft'
-          }`}
-        >
-          Healthcare
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function LoadingState() {
+  const t = useT();
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-hairline border-t-indigo-600" />
-      <p className="text-xs font-medium text-ink-soft">Synchronising clinical databases…</p>
+      <LogoMark size={52} />
+      <div className="h-1 w-32 overflow-hidden rounded-full bg-slate-200">
+        <div className="h-full w-1/2 animate-pulse rounded-full bg-indigo-500" />
+      </div>
+      <p className="text-xs font-medium text-ink-soft">{t('shell.loading')}</p>
     </div>
   );
 }
 
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const t = useT();
   return (
-    <div className="mx-auto my-12 max-w-md space-y-4 rounded-xl border border-rose-200 bg-rose-50/60 p-6 text-center dark:border-rose-900 dark:bg-rose-950/30">
-      <Activity className="mx-auto h-7 w-7 text-rose-600 dark:text-rose-400" />
+    <div className="mx-auto my-12 max-w-md space-y-4 rounded-2xl border border-rose-200 bg-rose-50/60 p-6 text-center">
+      <Activity className="mx-auto h-7 w-7 text-rose-600" />
       <div className="space-y-1.5">
-        <p className="font-serif text-sm font-semibold text-ink">Clinical system connection offline</p>
+        <p className="text-sm font-bold text-ink">{t('shell.offlineTitle')}</p>
         <p className="text-[12px] leading-relaxed text-ink-soft">{message}</p>
       </div>
       <button
         onClick={onRetry}
-        className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+        className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
       >
         <RefreshCw className="h-3.5 w-3.5" />
-        Retry system sync
+        {t('shell.tryAgain')}
       </button>
     </div>
   );
@@ -1022,6 +1325,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 
 /** Non-blocking notice for a background refresh that failed. */
 function RefreshBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const t = useT();
   return (
     <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
       <span className="flex-1">{message}</span>
@@ -1030,27 +1334,26 @@ function RefreshBanner({ message, onRetry }: { message: string; onRetry: () => v
         className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100"
       >
         <RefreshCw className="h-3.5 w-3.5" />
-        Retry
+        {t('shell.retry')}
       </button>
     </div>
   );
 }
 
 function NoActiveConsultation({ onDismiss }: { onDismiss: () => void }) {
+  const t = useT();
   return (
-    <div className="mx-auto my-12 max-w-md space-y-4 rounded-xl border border-hairline bg-surface p-6 text-center">
+    <div className="mx-auto my-12 max-w-md space-y-4 rounded-2xl border border-hairline bg-surface p-6 text-center">
       <Video className="mx-auto h-7 w-7 text-ink-soft" />
       <div className="space-y-1.5">
-        <p className="font-serif text-sm font-semibold text-ink">No consultation in session</p>
-        <p className="text-[12px] leading-relaxed text-ink-soft">
-          The telehealth cabin opens automatically when you join a scheduled video appointment.
-        </p>
+        <p className="text-sm font-bold text-ink">{t('shell.noSession')}</p>
+        <p className="text-[12px] leading-relaxed text-ink-soft">{t('shell.noSessionText')}</p>
       </div>
       <button
         onClick={onDismiss}
-        className="cursor-pointer rounded-md border border-hairline px-4 py-2 text-xs font-semibold text-ink transition-colors hover:bg-canvas"
+        className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-hairline px-4 py-2 text-xs font-semibold text-ink transition-colors hover:bg-canvas"
       >
-        Back to portal
+        <ArrowLeft className="h-3.5 w-3.5" /> {t('shell.goBack')}
       </button>
     </div>
   );
