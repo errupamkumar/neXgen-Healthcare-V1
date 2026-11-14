@@ -6,6 +6,8 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
+import { AsyncLocalStorage } from 'async_hooks';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 // NOTE: vite is imported lazily inside startServer(), not here. A top-level
@@ -18,7 +20,60 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
-const DATA_FILE = path.join(process.cwd(), 'data.json');
+
+/* =========================================================================
+   Storage.
+
+   The whole clinic dataset is one JSON document. Where it lives depends on
+   the environment:
+
+   - file  Local / VM (default): data.json in the working directory, read and
+           written synchronously — exactly as before.
+   - kv    Vercel (or anywhere) with KV_REST_API_URL + KV_REST_API_TOKEN, or
+           UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN set: the document
+           is kept in Redis over its REST API. Durable across deploys and
+           serverless cold starts.
+   - tmp   Vercel without a KV store: a copy of the bundled data.json in /tmp.
+           Writes work but are EPHEMERAL — they vanish on the next cold start.
+           Demo only; GET /api/health reports `persistent: false`.
+
+   Route handlers keep calling loadData()/saveData(). In kv mode a middleware
+   loads the document once per request into an AsyncLocalStorage context and,
+   if a handler changed it, writes it back BEFORE the response is sent — a
+   serverless function may be frozen the moment it replies.
+   ========================================================================= */
+const IS_VERCEL = Boolean(process.env.VERCEL);
+const KV_URL = (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '').replace(/\/+$/, '');
+const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+const KV_KEY = process.env.NEXGEN_DATA_KEY || 'nexgen:data';
+type StorageMode = 'file' | 'kv' | 'tmp';
+const STORAGE_MODE: StorageMode = KV_URL && KV_TOKEN ? 'kv' : IS_VERCEL ? 'tmp' : 'file';
+/** The bundled dataset — the live store locally, the seed elsewhere. */
+const SEED_FILE = path.join(process.cwd(), 'data.json');
+const DATA_FILE = STORAGE_MODE === 'tmp' ? path.join(os.tmpdir(), 'nexgen-data.json') : SEED_FILE;
+
+interface RequestStore {
+  data: any;
+  dirty: boolean;
+}
+const requestStore = new AsyncLocalStorage<RequestStore>();
+
+async function kvCommand(parts: string[], body?: string): Promise<any> {
+  const res = await fetch(`${KV_URL}/${parts.map(encodeURIComponent).join('/')}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { Authorization: `Bearer ${KV_TOKEN}` },
+    body,
+  });
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok || json.error) throw new Error(json.error || `KV request failed (${res.status})`);
+  return json.result;
+}
+
+const kvRead = async (): Promise<any | null> => {
+  const raw = await kvCommand(['get', KV_KEY]);
+  return raw ? JSON.parse(raw) : null;
+};
+const kvWrite = (data: any) => kvCommand(['set', KV_KEY], JSON.stringify(data));
 
 /**
  * The online slot reservation fee — the only money this system ever handles.
@@ -535,47 +590,55 @@ const DEFAULT_HOSPITAL_CONFIG = {
   announcementText: 'Please keep your 14-digit ABHA Health ID and Aadhaar ready for fast OPD registration & digital prescriptions.',
 };
 
+/** Fill in collections added after a dataset was first written. */
+function normalizeData(parsed: any) {
+  if (!parsed.doctors) parsed.doctors = DEFAULT_DOCTORS;
+  if (!parsed.patients) parsed.patients = [];
+  if (!parsed.documents) parsed.documents = [];
+  if (!parsed.appointments) parsed.appointments = [];
+  if (!parsed.hospitalConfig) parsed.hospitalConfig = DEFAULT_HOSPITAL_CONFIG;
+  if (!parsed.waitlist) parsed.waitlist = [];
+  if (!parsed.notifications) parsed.notifications = [];
+  if (!parsed.messages) parsed.messages = [];
+  if (!parsed.doctorApplications) parsed.doctorApplications = [];
+  return parsed;
+}
+
+function initialState() {
+  return normalizeData({});
+}
+
+/** The dataset shipped with the app — seeds the kv and tmp stores. */
+function readSeed() {
+  try {
+    if (fs.existsSync(SEED_FILE)) return normalizeData(JSON.parse(fs.readFileSync(SEED_FILE, 'utf8')));
+  } catch (err) {
+    console.error('Error reading seed data:', err);
+  }
+  return initialState();
+}
+
 // Helper to load/save JSON data
 function loadData() {
+  const ctx = requestStore.getStore();
+  if (ctx) return ctx.data;
+
   try {
+    // tmp mode: start every cold instance from the bundled dataset.
+    if (STORAGE_MODE === 'tmp' && !fs.existsSync(DATA_FILE)) {
+      fs.writeFileSync(DATA_FILE, JSON.stringify(readSeed(), null, 2), 'utf8');
+    }
     if (fs.existsSync(DATA_FILE)) {
-      const raw = fs.readFileSync(DATA_FILE, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (!parsed.hospitalConfig) {
-        parsed.hospitalConfig = DEFAULT_HOSPITAL_CONFIG;
-      }
-      if (!parsed.waitlist) {
-        parsed.waitlist = [];
-      }
-      if (!parsed.notifications) {
-        parsed.notifications = [];
-      }
-      if (!parsed.messages) {
-        parsed.messages = [];
-      }
-      if (!parsed.doctorApplications) {
-        parsed.doctorApplications = [];
-      }
-      return parsed;
+      return normalizeData(JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')));
     }
   } catch (err) {
     console.error('Error reading data file:', err);
   }
 
   // Fallback initial state
-  const initialState = {
-    doctors: DEFAULT_DOCTORS,
-    patients: [],
-    documents: [],
-    appointments: [],
-    waitlist: [],
-    notifications: [],
-    messages: [],
-    doctorApplications: [],
-    hospitalConfig: DEFAULT_HOSPITAL_CONFIG,
-  };
-  saveData(initialState);
-  return initialState;
+  const fresh = initialState();
+  saveData(fresh);
+  return fresh;
 }
 
 function processWaitlistNotifications(data: any, doctorId: string, date: string, timeSlot: string) {
@@ -614,6 +677,12 @@ function processWaitlistNotifications(data: any, doctorId: string, date: string,
 }
 
 function saveData(data: any) {
+  const ctx = requestStore.getStore();
+  if (ctx) {
+    ctx.data = data;
+    ctx.dirty = true;
+    return;
+  }
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
@@ -621,8 +690,54 @@ function saveData(data: any) {
   }
 }
 
-// Ensure the data file is initialized on startup
-loadData();
+// Ensure the data file is initialized on startup (file / tmp stores).
+if (STORAGE_MODE !== 'kv') loadData();
+
+/** Deployment self-check: which store is live, and does it survive restarts? */
+app.get('/api/health', (req, res) => {
+  res.json({
+    ok: true,
+    storage: STORAGE_MODE,
+    persistent: STORAGE_MODE !== 'tmp',
+    vercel: IS_VERCEL,
+    time: new Date().toISOString(),
+  });
+});
+
+if (STORAGE_MODE === 'kv') {
+  app.use('/api', async (req, res, next) => {
+    let data: any;
+    try {
+      data = await kvRead();
+      if (!data) {
+        // First request against an empty store: seed it from data.json.
+        data = readSeed();
+        await kvWrite(data);
+      }
+    } catch (err: any) {
+      console.error('KV read failed:', err);
+      return res.status(503).json({ error: 'The clinic data store is unavailable. Please try again shortly.' });
+    }
+
+    const ctx: RequestStore = { data: normalizeData(data), dirty: false };
+    const sendJson = res.json.bind(res);
+    // Persist before replying: a serverless instance may freeze after it sends.
+    res.json = ((body: any) => {
+      if (!ctx.dirty) return sendJson(body);
+      ctx.dirty = false;
+      kvWrite(ctx.data)
+        .then(() => sendJson(body))
+        .catch(err => {
+          console.error('KV write failed:', err);
+          res.status(503);
+          sendJson({ error: 'Your change could not be saved. Please try again.' });
+        });
+      return res;
+    }) as typeof res.json;
+
+    requestStore.run(ctx, () => next());
+  });
+}
 
 // ================= API ENDPOINTS =================
 
@@ -2032,7 +2147,10 @@ app.post('/api/system/reset', (req, res) => {
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     // Dev only: pulled in on demand so it never enters the production graph.
-    const { createServer: createViteServer } = await import('vite');
+    // The specifier is a variable so serverless bundlers (Vercel's file
+    // tracer) do not pack vite and its native binaries into the function.
+    const viteModule = 'vite';
+    const { createServer: createViteServer } = await import(viteModule);
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -2047,8 +2165,13 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT} (storage: ${STORAGE_MODE})`);
   });
 }
 
-startServer();
+// On Vercel the platform owns the HTTP server and the static files: the app is
+// exported to api/index.ts as a request handler instead of listening.
+if (!IS_VERCEL) startServer();
+
+export default app;
+export { app };

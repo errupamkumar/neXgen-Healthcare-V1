@@ -9,7 +9,7 @@ every frame is the app's own React stage, recorded frame by frame.
 | File | What it is |
 |---|---|
 | `nexgen-for-doctors.mp4` | 1920×1080, 30 fps, H.264 + AAC, with English and Hindi subtitle tracks (switch in any player) |
-| `nexgen-for-doctors-hindi-captions.mp4` | Same video with Hindi captions burned in — for WhatsApp / social sharing |
+| `docs/video/nexgen-for-doctors-hindi-captions.mp4` | Same video with Hindi captions burned in — for WhatsApp / social sharing (kept out of `public/` so it is not deployed) |
 | `nexgen-for-doctors-narration.m4a` | Voice-over + soft background pad; the live `/doctors-video` page plays it in sync |
 | `nexgen-for-doctors.en.vtt`, `.hi.vtt` | Subtitles used by the website's video player |
 | `nexgen-for-doctors-poster.jpg` | Poster frame |

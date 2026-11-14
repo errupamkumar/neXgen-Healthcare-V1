@@ -1,0 +1,9 @@
+# Not needed to build or run the Vercel deployment.
+build/
+deploy/
+backend/
+docs/
+coverage/
+*.log
+data.backup*.json
+scripts/doctor-video/

@@ -42,6 +42,8 @@ const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 const FFPROBE = process.env.FFPROBE || FFMPEG.replace(/ffmpeg(\.exe)?$/i, m => m.replace('ffmpeg', 'ffprobe'));
 const CHROME = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const WORK = path.join(os.tmpdir(), 'nexgen-doctor-video');
+/** Share-only outputs (WhatsApp copy) live outside public/ so they never bloat a web deploy. */
+const SHARE_DIR = path.join(ROOT, 'docs', 'video');
 
 function loadPlaywright() {
   for (const candidate of ['playwright-core', path.resolve(ROOT, '../nexgen-hms/node_modules/playwright-core')]) {
@@ -71,19 +73,23 @@ const log = (...m) => console.log('›', ...m);
 
 /* ------------------------------------------------------------ 1. narration */
 const narration = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/components/presentation/narration.json'), 'utf8'));
-fs.rmSync(WORK, { recursive: true, force: true });
-fs.mkdirSync(path.join(WORK, 'wav'), { recursive: true });
+const REUSE_AUDIO = Boolean(args['reuse-audio']);
 fs.mkdirSync(MEDIA, { recursive: true });
-fs.writeFileSync(path.join(WORK, 'lines.json'), JSON.stringify(narration.map(n => ({ id: n.id, text: n.tts }))), 'utf8');
-
-log(`narrating ${narration.length} scenes with ${VOICE}…`);
-run('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(HERE, 'tts.ps1'), '-Lines', path.join(WORK, 'lines.json'), '-OutDir', path.join(WORK, 'wav'), '-Voice', VOICE]);
+fs.mkdirSync(SHARE_DIR, { recursive: true });
+if (!REUSE_AUDIO) {
+  fs.rmSync(WORK, { recursive: true, force: true });
+  fs.mkdirSync(path.join(WORK, 'wav'), { recursive: true });
+  fs.writeFileSync(path.join(WORK, 'lines.json'), JSON.stringify(narration.map(n => ({ id: n.id, text: n.tts }))), 'utf8');
+  log(`narrating ${narration.length} scenes with ${VOICE}…`);
+  run('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(HERE, 'tts.ps1'), '-Lines', path.join(WORK, 'lines.json'), '-OutDir', path.join(WORK, 'wav'), '-Voice', VOICE]);
+}
 
 /* --------------------------------------------------------------- 2. timing */
 const LEAD = 550; // breath before the voice starts
 const TAIL = 850; // hold after it ends, before the scene changes
 let cursor = 0;
-const scenes = narration.map((n, i) => {
+const reused = REUSE_AUDIO ? JSON.parse(fs.readFileSync(path.join(MEDIA, 'narration-timing.json'), 'utf8')) : null;
+const scenes = reused ? reused.scenes : narration.map((n, i) => {
   const speech = durationOf(path.join(WORK, 'wav', `${n.id}.wav`));
   const lead = i === 0 ? 1200 : LEAD;
   const tail = i === narration.length - 1 ? 3200 : TAIL;
@@ -91,9 +97,9 @@ const scenes = narration.map((n, i) => {
   cursor += scene.duration;
   return scene;
 });
-const totalMs = cursor;
-fs.writeFileSync(path.join(MEDIA, 'narration-timing.json'), JSON.stringify({ voice: VOICE, total: totalMs, scenes }, null, 2));
-log(`total ${(totalMs / 1000).toFixed(1)} s`);
+const totalMs = reused ? reused.total : cursor;
+if (!reused) fs.writeFileSync(path.join(MEDIA, 'narration-timing.json'), JSON.stringify({ voice: VOICE, total: totalMs, scenes }, null, 2));
+log(`total ${(totalMs / 1000).toFixed(1)} s${reused ? ' (reusing narration)' : ''}`);
 
 /* ---------------------------------------------------------------- 3. audio */
 // A gentle four-chord pad (Cmaj7 – Am7 – Fmaj7 – G), each chord swelling in
@@ -128,8 +134,8 @@ const filter = [
   `[voice][pad]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11,atrim=0:${totalSec}[out]`,
 ].join(';');
 const narrationM4a = path.join(MEDIA, 'nexgen-for-doctors-narration.m4a');
-log('mixing narration + pad…');
-run(FFMPEG, ['-y', '-hide_banner', '-loglevel', 'error', ...voiceInputs, '-filter_complex', filter, '-map', '[out]', '-c:a', 'aac', '-b:a', '192k', narrationM4a]);
+if (!REUSE_AUDIO) log('mixing narration + pad…');
+if (!REUSE_AUDIO) run(FFMPEG, ['-y', '-hide_banner', '-loglevel', 'error', ...voiceInputs, '-filter_complex', filter, '-map', '[out]', '-c:a', 'aac', '-b:a', '192k', narrationM4a]);
 
 /* ----------------------------------------------------- subtitles (SRT/VTT) */
 const stamp = (ms, sep) => {
@@ -156,7 +162,7 @@ function cuesFor(lang) {
   });
   return cues;
 }
-for (const lang of ['en', 'hi']) {
+for (const lang of REUSE_AUDIO ? [] : ['en', 'hi']) {
   const cues = cuesFor(lang);
   fs.writeFileSync(
     path.join(WORK, `${lang}.srt`),
@@ -215,7 +221,7 @@ function encode(framesDir, out, withSoftSubs) {
     ...inputs, ...maps,
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '19', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-tune', 'animation',
     '-c:a', 'copy', ...extra,
-    '-movflags', '+faststart', '-shortest',
+    '-movflags', '+faststart', '-t', (totalMs / 1000).toFixed(3),
     '-metadata', 'title=neXgen Healthcare — for doctors',
     out,
   ]);
@@ -237,12 +243,14 @@ if (!args['skip-hindi']) {
   const hiFrames = path.join(WORK, 'frames-hi');
   await captureFrames(hiFrames, '&captions=hi');
   log('encoding Hindi-captioned MP4…');
-  encode(hiFrames, path.join(MEDIA, 'nexgen-for-doctors-hindi-captions.mp4'), false);
+  encode(hiFrames, path.join(SHARE_DIR, 'nexgen-for-doctors-hindi-captions.mp4'), false);
   fs.rmSync(hiFrames, { recursive: true, force: true });
 }
 
-for (const f of fs.readdirSync(MEDIA)) {
-  const size = fs.statSync(path.join(MEDIA, f)).size;
-  log(`${f.padEnd(44)} ${(size / 1048576).toFixed(1)} MB`);
+for (const dir of [MEDIA, SHARE_DIR]) {
+  for (const f of fs.readdirSync(dir)) {
+    const size = fs.statSync(path.join(dir, f)).size;
+    log(`${path.relative(ROOT, path.join(dir, f)).padEnd(56)} ${(size / 1048576).toFixed(1)} MB`);
+  }
 }
 log('done.');

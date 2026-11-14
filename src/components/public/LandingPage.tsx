@@ -176,7 +176,7 @@ export default function LandingPage({ doctors, appointments, onSignIn, onBook }:
   return (
     <div className="screen-scale min-h-screen bg-white font-sans text-slate-900 antialiased">
       {/* ------------------------------------------------------------ Top bar */}
-      <div className="hidden bg-slate-950 text-[13px] text-white/75 md:block">
+      <div className="hidden bg-slate-950 text-[13px] text-white/75 lg:block">
         <div className={`${WRAP} flex items-center justify-between gap-6 py-2`}>
           <div className="flex items-center gap-6">
             <span className="flex items-center gap-2">
