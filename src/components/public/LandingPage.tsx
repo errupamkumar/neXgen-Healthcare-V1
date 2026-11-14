@@ -174,7 +174,7 @@ export default function LandingPage({ doctors, appointments, onSignIn, onBook }:
   const emergency = clinic.emergencyContact || '102';
 
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-900 antialiased">
+    <div className="screen-scale min-h-screen bg-white font-sans text-slate-900 antialiased">
       {/* ------------------------------------------------------------ Top bar */}
       <div className="hidden bg-slate-950 text-[13px] text-white/75 md:block">
         <div className={`${WRAP} flex items-center justify-between gap-6 py-2`}>
@@ -287,7 +287,7 @@ export default function LandingPage({ doctors, appointments, onSignIn, onBook }:
           <div className="pointer-events-none absolute -left-40 top-40 h-[420px] w-[420px] rounded-full bg-indigo-200/40 blur-3xl" />
 
           <div
-            className={`${WRAP} relative grid items-center gap-12 pb-28 pt-10 sm:pt-14 lg:min-h-[calc(100svh-110px)] lg:grid-cols-[1.05fr_1fr] lg:pb-36 lg:pt-10 2xl:gap-20`}
+            className={`${WRAP} relative grid items-center gap-12 pb-28 pt-10 sm:pt-14 lg:min-h-[calc((100svh-110px)/var(--screen-zoom,1))] lg:grid-cols-[1.05fr_1fr] lg:pb-36 lg:pt-10 2xl:gap-20`}
           >
             <div className="animate-fade-up min-w-0 space-y-7">
               <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-3.5 py-1.5 text-[13px] font-semibold text-indigo-700 shadow-sm">
@@ -692,13 +692,13 @@ export default function LandingPage({ doctors, appointments, onSignIn, onBook }:
                   <button
                     type="button"
                     onClick={() => setShowVideo(true)}
-                    className="group relative mt-8 block w-full max-w-xl cursor-pointer overflow-hidden rounded-2xl text-left ring-1 ring-white/10"
+                    className="bg-brand group relative mt-8 block aspect-video w-full max-w-xl cursor-pointer overflow-hidden rounded-2xl text-left ring-1 ring-white/10"
                     aria-label={t('landing.fd.watch')}
                   >
                     <img
                       src="/media/nexgen-for-doctors-poster.jpg"
                       alt=""
-                      className="aspect-video w-full object-cover opacity-60 transition-opacity group-hover:opacity-75"
+                      className="absolute inset-0 h-full w-full object-cover opacity-70 transition-opacity group-hover:opacity-85"
                       onError={e => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
                     />
                     <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/90 via-slate-950/40 to-transparent" />

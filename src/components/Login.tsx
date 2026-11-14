@@ -421,7 +421,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
   };
 
   return (
-    <div className="min-h-[calc(100svh-4rem)] w-full flex flex-col lg:flex-row bg-slate-50 font-sans">
+    <div className="min-h-[calc((100svh-4rem)/var(--screen-zoom,1))] w-full flex flex-col lg:flex-row bg-slate-50 font-sans">
 
       {/* ========================================================= */}
       {/* ROLE PORTAL SWITCHER — rendered into the app header bar    */}
@@ -467,7 +467,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
       {/* ========================================================= */}
       {/* LEFT SIDE: BRANDING, HERO IMAGE & TAGLINE                 */}
       {/* ========================================================= */}
-      <div className="w-full lg:w-3/5 bg-gradient-to-br from-indigo-100 via-white to-teal-100 text-slate-900 relative flex flex-col justify-between p-8 sm:p-12 lg:p-16 overflow-hidden min-h-[380px] lg:min-h-[calc(100svh-4rem)] border-b lg:border-b-0 lg:border-r border-indigo-100">
+      <div className="w-full lg:w-3/5 bg-gradient-to-br from-indigo-100 via-white to-teal-100 text-slate-900 relative flex flex-col justify-between p-8 sm:p-12 lg:p-16 overflow-hidden min-h-[380px] lg:min-h-[calc((100svh-4rem)/var(--screen-zoom,1))] border-b lg:border-b-0 lg:border-r border-indigo-100">
         
         {/* Background Image with Light Blue Gradient Overlay */}
         <div 
@@ -476,7 +476,7 @@ export default function Login({ doctors, patients, onLoginSuccess, onRegisterPat
             backgroundImage: `url('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=1600')` 
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-indigo-100/90 via-white/70 to-teal-50/80" />
+        <div className="absolute inset-0 bg-gradient-to-t from-indigo-100/90 via-canvas/70 to-teal-50/80" />
 
         {/* Top status strip — the wordmark now lives in the app shell header. */}
         <div className="relative z-10 flex items-center justify-end">

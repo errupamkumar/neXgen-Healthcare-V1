@@ -9,10 +9,12 @@
    Neutrals carry a faint blue so white cards sit on a calm, airy canvas.
    ========================================================================= */
 
-/* The app ships a single light theme. Tailwind v4 otherwise binds `dark:` to
-   prefers-color-scheme, which would half-apply the incomplete dark styling
-   still present in some components to anyone on a dark OS. */
-@custom-variant dark (&:where(.dark, .dark *));
+/* Dark mode is implemented centrally (see the `.dark` theme below), not with
+   per-element `dark:` utilities. Older screens still carry a few partial
+   `dark:` classes written for the original palette; binding the variant to a
+   class that is never set keeps them dormant so they cannot fight the central
+   theme. Tailwind would otherwise bind `dark:` to prefers-color-scheme. */
+@custom-variant dark (&:where(.legacy-dark-unused, .legacy-dark-unused *));
 
 /* -------------------------------------------------------------------------
    Runtime surface tokens
@@ -631,4 +633,32 @@
 /* Map tiles and photos stay true-colour, just a touch dimmer. */
 .dark img {
   filter: brightness(0.94);
+}
+
+/* -------------------------------------------------------------------------
+   Large screens: scale the whole interface proportionally on QHD / 4K
+   displays so pages fill the screen exactly as they do at 1080p, instead of
+   floating in wide margins. `--screen-zoom` lets viewport-height layouts
+   (the hero) divide the zoom back out and still fit one screen.
+   ------------------------------------------------------------------------- */
+.screen-scale {
+  --screen-zoom: 1;
+}
+@media (min-width: 2200px) {
+  .screen-scale {
+    zoom: 1.2;
+    --screen-zoom: 1.2;
+  }
+}
+@media (min-width: 2800px) {
+  .screen-scale {
+    zoom: 1.45;
+    --screen-zoom: 1.45;
+  }
+}
+@media (min-width: 3400px) {
+  .screen-scale {
+    zoom: 1.8;
+    --screen-zoom: 1.8;
+  }
 }

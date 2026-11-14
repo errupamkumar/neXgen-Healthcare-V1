@@ -1010,7 +1010,7 @@ export default function App() {
     }
 
     return (
-      <div className="min-h-screen bg-canvas text-ink font-sans antialiased flex flex-col">
+      <div className="screen-scale min-h-screen bg-canvas text-ink font-sans antialiased flex flex-col">
         <header className="border-b border-hairline bg-surface">
           <div className="flex h-16 w-full items-center gap-4 px-5 lg:px-8">
             <button
@@ -1068,7 +1068,7 @@ export default function App() {
      Signed in — fixed left rail + content column.
      --------------------------------------------------------------------- */
   return (
-    <div className="min-h-screen bg-canvas text-ink font-sans antialiased">
+    <div className="screen-scale min-h-screen bg-canvas text-ink font-sans antialiased">
       {/* Scrim for the mobile drawer */}
       <div
         onClick={() => setIsNavOpen(false)}

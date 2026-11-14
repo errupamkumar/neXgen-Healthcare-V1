@@ -996,17 +996,9 @@ export default function DoctorBooking({
                 <p className="text-base font-semibold text-slate-900">{t('book.searchToSee')}</p>
                 <p className="mx-auto max-w-md text-sm text-slate-500">
                   {typedQuery && !hasTypedQuery ? (
-                    <>
-                      Keep typing — {doctorDirectoryConfig.minSearchChars} characters or more brings up
-                      matching doctors.
-                    </>
+                    t('book.keepTyping', { n: doctorDirectoryConfig.minSearchChars })
                   ) : (
-                    <>
-                      Type a doctor’s name, speciality, hospital or locality above
-                      {doctorDirectoryConfig.revealOnFilter && ', or pick a department'}. We hold{' '}
-                      <strong className="font-semibold text-slate-700">{doctors.length}</strong> consulting{' '}
-                      {doctors.length === 1 ? 'chamber' : 'chambers'} across {directoryArea}.
-                    </>
+                    t('book.searchHint2', { n: doctors.length, area: directoryArea })
                   )}
                 </p>
               </div>
